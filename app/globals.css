@@ -1,0 +1,84 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-primary-950: #172554;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-cursor-blink: cursor-blink 1s step-end infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-14px); }
+  }
+  @keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Design tokens — mirrors COLORS constants in constants/colors.ts exactly.
+   Sidebar + cards both use --bg-card so they share the same surface.
+   Page canvas uses --bg which is slightly different to create depth.
+   ----------------------------------------------------------------------------- */
+:root {
+  --bg:             #f1f5f9;   /* COLORS.light.bg          */
+  --bg-card:        #ffffff;   /* COLORS.light.bgCard      */
+  --border:         #e2e8f0;   /* COLORS.light.border      */
+  --text:           #0f172a;   /* COLORS.light.textPrimary */
+  --text-secondary: #475569;   /* COLORS.light.textSecondary */
+  --text-muted:     #94a3b8;   /* COLORS.light.textMuted   */
+}
+
+.dark {
+  --bg:             #020812;   /* COLORS.dark.bg           */
+  --bg-card:        #0d1424;   /* COLORS.dark.bgCard       */
+  --border:         #1e293b;   /* COLORS.dark.border       */
+  --text:           #f1f5f9;   /* COLORS.dark.textPrimary  */
+  --text-secondary: #94a3b8;   /* COLORS.dark.textSecondary */
+  --text-muted:     #475569;   /* COLORS.dark.textMuted    */
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s, color 0.2s;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Landing page only */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(37,99,235,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37,99,235,0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+.dark .grid-bg {
+  background-image:
+    linear-gradient(rgba(37,99,235,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37,99,235,0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
