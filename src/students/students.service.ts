@@ -1,0 +1,176 @@
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import { FirebaseService } from '../firebase/firebase.service';
+
+@Injectable()
+export class StudentsService {
+  constructor(
+    private prisma: PrismaService,
+    private jwt: JwtService,
+    private firebase: FirebaseService,
+  ) {}
+
+  async register(dto: any) {
+    const existing = await this.prisma.student.findUnique({
+      where: { email: dto.email }
+    });
+    if (existing) throw new ConflictException('Email already in use');
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const student = await this.prisma.student.create({
+      data: {
+        email: dto.email,
+        password: hashedPassword,
+        name: dto.name,
+      }
+    });
+
+    return this.generateToken(student);
+  }
+
+  async login(dto: any) {
+    const student = await this.prisma.student.findUnique({
+      where: { email: dto.email }
+    });
+    if (!student) throw new UnauthorizedException('Invalid credentials');
+    if (!student.password) throw new UnauthorizedException('Please login with Google');
+
+    const valid = await bcrypt.compare(dto.password, student.password);
+    if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    return this.generateToken(student);
+  }
+
+  async googleAuth(dto: { firebaseIdToken: string }) {
+    let decodedToken;
+    try {
+      decodedToken = await this.firebase.verifyIdToken(dto.firebaseIdToken);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Firebase ID token');
+    }
+
+    const { uid, email, name, picture } = decodedToken;
+    if (!email) throw new UnauthorizedException('Google account must have an email');
+
+    const student = await this.prisma.student.upsert({
+      where: { email },
+      update: { firebaseUid: uid, avatarUrl: picture, name: name || email.split('@')[0] },
+      create: { 
+        email, 
+        firebaseUid: uid, 
+        name: name || email.split('@')[0],
+        avatarUrl: picture
+      }
+    });
+
+    return this.generateToken(student);
+  }
+
+  async getMyClasses(studentId: string) {
+    return this.prisma.enrollment.findMany({
+      where: { studentId },
+      include: {
+        subject: {
+          include: {
+            teacher: { select: { name: true, email: true } },
+            _count: { select: { files: true } }
+          }
+        }
+      }
+    });
+  }
+
+  async joinClass(studentId: string, classCode: string) {
+    const subject = await this.prisma.subject.findUnique({
+      where: { classCode: classCode.trim().toUpperCase() }
+    });
+    if (!subject) throw new NotFoundException('Invalid class code. Please check with your teacher.');
+
+    // Check if mapping exists
+    const existing = await this.prisma.enrollment.findUnique({
+      where: { studentId_subjectId: { studentId, subjectId: subject.id } }
+    });
+    if (existing) return { message: 'You have already joined this classroom.', subject };
+
+    const enrollment = await this.prisma.enrollment.create({
+      data: { studentId, subjectId: subject.id },
+      include: { subject: true }
+    });
+
+    return { message: 'Joined successfully!', subject: enrollment.subject };
+  }
+
+  async getClassDetails(studentId: string, subjectId: string) {
+    // 1. Verify enrollment
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { studentId_subjectId: { studentId, subjectId } },
+      include: {
+        subject: {
+          include: {
+            teacher: { select: { id: true, name: true, email: true, avatarUrl: true } },
+            files: {
+              where: { status: 'ready' },
+              select: {
+                id: true,
+                name: true,
+                displayName: true,
+                mimeType: true,
+                sizeBytes: true,
+                createdAt: true,
+                storagePath: true,
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!enrollment) {
+      throw new UnauthorizedException('You are not enrolled in this class');
+    }
+
+    return enrollment.subject;
+  }
+
+  async getFileStream(studentId: string, fileId: string) {
+    const file = await this.prisma.knowledgeFile.findUnique({
+      where: { id: fileId },
+    });
+
+    if (!file) throw new NotFoundException('File not found');
+
+    // Verify enrollment if it belongs to a subject
+    if (file.subjectId) {
+      const enrollment = await this.prisma.enrollment.findUnique({
+        where: { studentId_subjectId: { studentId, subjectId: file.subjectId } }
+      });
+      if (!enrollment) throw new UnauthorizedException('You are not enrolled in the subject this file belongs to');
+    } else {
+      // If it's a general file in teacher's KB, maybe students can't access it unless it's in a subject?
+      // For now, let's assume students only access subject-linked files.
+      throw new UnauthorizedException('Access denied to private knowledge base files');
+    }
+
+    return {
+      path: file.storagePath,
+      mimeType: file.mimeType,
+      originalName: file.originalName,
+    };
+  }
+
+  private generateToken(student: any) {
+    const payload = { sub: student.id, email: student.email, role: 'student' };
+    return {
+      accessToken: this.jwt.sign(payload),
+      user: { 
+        id: student.id, 
+        email: student.email, 
+        name: student.name, 
+        role: 'student', 
+        avatarUrl: student.avatarUrl 
+      },
+    };
+  }
+}
