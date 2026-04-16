@@ -1,6 +1,16 @@
 version: '3.8'
 
+# =============================================================================
+# TEACHER FULL STACK — DOCKER COMPOSE PRODUCTION CONFIGURATION
+# =============================================================================
+# ENV requirements:
+#   ./backend/.env  → Must have JWT_SECRET, FIREBASE_*, GOOGLE_* keys
+#   ./ai/.env       → Must have GEMINI_API_KEY
+# DATABASE_URL is overridden here to use the internal Docker hostname 'db'
+# =============================================================================
+
 services:
+  # ─── PostgreSQL Database ───────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
     container_name: teacher_postgres
@@ -17,8 +27,9 @@ services:
       test: ["CMD-SHELL", "pg_isready -U admin -d teacher_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
+  # ─── NestJS Backend API ────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -27,17 +38,22 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      # Loads JWT_SECRET, FIREBASE_*, GOOGLE_* from your local backend/.env
+      - ./backend/.env
     environment:
-      - DATABASE_URL=postgresql://admin:securepassword123@db:5432/teacher_db?schema=public
-      - JWT_SECRET=super_secret_for_jwt
-      - PORT=3000
-      - FRONTEND_URL=http://localhost:3001
-      - STUDENT_APP_URL=http://localhost:3002
-      - AI_API_URL=http://ai:8000
+      # IMPORTANT: Override DATABASE_URL so it uses the Docker internal 'db' hostname
+      # NOT localhost (which would fail inside a container)
+      DATABASE_URL: postgresql://admin:securepassword123@db:5432/teacher_db?schema=public
+      NODE_ENV: production
+      AI_API_URL: http://ai:8000
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
 
+  # ─── FastAPI AI / RAG Engine ───────────────────────────────────────────────
   ai:
     build:
       context: ./ai
@@ -46,40 +62,55 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - PORT=8000
     env_file:
+      # Loads GEMINI_API_KEY from your local ai/.env
       - ./ai/.env
+    environment:
+      # Override local path — inside Docker we use the shared volume
+      UPLOADS_ROOT: /app/uploads
+      CHROMA_PERSIST_DIR: /app/chroma_db
     volumes:
-      - ./ai/chroma_db:/app/chroma_db
-      
+      - chroma_data:/app/chroma_db
+      - uploads_data:/app/uploads:ro
+
+  # ─── Admin / Teacher Portal (Next.js) ─────────────────────────────────────
   frontend_new:
     build:
       context: ./frontend_new
       dockerfile: Dockerfile
+      args:
+        # Build-time env vars for Next.js NEXT_PUBLIC_* (baked into the build)
+        NEXT_PUBLIC_API_URL: http://localhost:3000/api
     container_name: teacher_frontend
     restart: unless-stopped
     ports:
       - "3001:3001"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+      PORT: 3001
     depends_on:
       - backend
 
+  # ─── Student Portal (Next.js) ─────────────────────────────────────────────
   student_new:
     build:
       context: ./student_new
       dockerfile: Dockerfile
+      args:
+        # Build-time env vars for Next.js NEXT_PUBLIC_* (baked into the build)
+        NEXT_PUBLIC_API_URL: http://localhost:3000/api
+        NEXT_PUBLIC_RAG_API_URL: http://localhost:8000
     container_name: teacher_student
     restart: unless-stopped
     ports:
       - "3002:3002"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
-      - NEXT_PUBLIC_RAG_API_URL=http://localhost:8000
+      PORT: 3002
     depends_on:
       - backend
       - ai
 
+# ─── Named Volumes (persistent across restarts) ──────────────────────────────
 volumes:
-  postgres_data:
+  postgres_data:    # Postgres database files
+  uploads_data:     # Uploaded documents (shared between backend + ai)
+  chroma_data:      # ChromaDB vector index
