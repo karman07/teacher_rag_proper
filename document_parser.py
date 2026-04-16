@@ -21,6 +21,8 @@ def parse_document(file_path: str) -> str:
 
     if ext == ".pdf":
         return _parse_pdf(file_path)
+    elif ext in (".png", ".jpg", ".jpeg"):
+        return f"[IMAGE_FILE:{path.name}]" # Placeholder, RAGEngine will handle visual description
     elif ext in (".docx",):
         return _parse_docx(file_path)
     elif ext in (".pptx",):

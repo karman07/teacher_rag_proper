@@ -43,7 +43,7 @@ class RAGEngine:
         # Configure Gemini
         genai.configure(api_key=cfg.gemini_api_key)
         self._embed_model = "models/gemini-embedding-001"
-        self._gen_model   = genai.GenerativeModel("gemini-2.5-flash")
+        self._gen_model   = genai.GenerativeModel("gemini-1.5-flash")
 
         # ChromaDB persistent client
         os.makedirs(cfg.chroma_persist_dir, exist_ok=True)
@@ -56,6 +56,30 @@ class RAGEngine:
         logger.info("RAGEngine initialised — Gemini + ChromaDB ready")
 
     # ─── Public: Ingest ────────────────────────────────────────────────────────
+    async def _describe_visual_content(self, file_path: str, mime_type: str) -> str:
+        """Use Gemini Vision to describe an image, graph, or chart."""
+        logger.info(f"[vision] describing {mime_type} at {file_path}")
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+            
+            # Use current gen_model (Gemini Flash) for vision
+            prompt = (
+                "You are an expert academic assistant. Describe this image, graph, or chart in thorough detail. "
+                "Include all text found, explain trends in graphs, and describe visual relationships. "
+                "The output will be used for a RAG knowledge base to help students learn."
+            )
+            contents = [
+                prompt,
+                {"mime_type": mime_type, "data": data}
+            ]
+            
+            # Using asyncio to thread since SDK might be sync
+            response = await asyncio.to_thread(self._gen_model.generate_content, contents)
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"[vision] failed to describe {file_path}: {e}")
+            return ""
 
     async def ingest_file(
         self,
@@ -67,17 +91,49 @@ class RAGEngine:
         file_name: str,
     ) -> dict:
         """
-        Parse the document at `file_path`, chunk it, embed with Gemini,
-        and upsert into the teacher's private ChromaDB collection.
-
-        Returns {'chunks_added': int, 'file_id': str}
+        Parse the document, including visual descriptions for images/graphs, chunk it,
+        and index in ChromaDB.
         """
         logger.info(f"[ingest] teacher={teacher_id} file={file_name}")
 
-        # 1. Parse to text
-        text = parse_document(file_path)
+        ext = os.path.splitext(file_path)[1].lower()
+        text = ""
+
+        # 1. Handle Images directly
+        if ext in ('.png', '.jpg', '.jpeg', '.webp'):
+            mime = f"image/{ext[1:] if ext != '.jpg' else 'jpeg'}"
+            visual_desc = await self._describe_visual_content(file_path, mime)
+            text = f"[Source: {file_name} (Image)]\n\n{visual_desc}"
+        else:
+            # 2. Parse standard document
+            text = parse_document(file_path)
+            
+            # 3. Special handling for PDFs: Look for graphs/images if text is thin
+            if ext == '.pdf' and (not text or len(text.strip()) < 200):
+                logger.info(f"[ingest] Low text density in PDF {file_name}, using Vision OCR")
+                try:
+                    import fitz
+                    doc = fitz.open(file_path)
+                    ocr_texts = []
+                    # Just do the first 5 pages to avoid cost/time if it's huge, 
+                    # but usually educational PDFs are focused.
+                    for i in range(min(len(doc), 10)):
+                        page = doc[i]
+                        pix = page.get_pixmap()
+                        img_path = f"{file_path}_p{i}.png"
+                        pix.save(img_path)
+                        page_desc = await self._describe_visual_content(img_path, "image/png")
+                        if page_desc:
+                            ocr_texts.append(f"[Page {i+1} Visual Analysis]:\n{page_desc}")
+                        if os.path.exists(img_path): os.remove(img_path)
+                    
+                    if ocr_texts:
+                        text += "\n\n" + "\n\n".join(ocr_texts)
+                except Exception as e:
+                    logger.warning(f"[ingest] PDF Vision fallback failed: {e}")
+
         if not text.strip():
-            raise ValueError(f"No extractable text in {file_name}")
+            raise ValueError(f"No extractable content (text or visual) in {file_name}")
 
         # 2. Chunk
         chunks = self._chunk_text(text)
@@ -149,6 +205,7 @@ class RAGEngine:
         teacher_id: str,
         collection_name: str,
         question: str,
+        image_base64: Optional[str] = None,
         top_k: int = 6,
         chat_history: Optional[list[dict]] = None,
     ) -> dict:
@@ -204,21 +261,41 @@ class RAGEngine:
                 role  = "Student" if msg.get("role") == "user" else "Assistant"
                 history_text += f"{role}: {msg.get('content', '')}\n"
 
-        system_prompt = f"""You are an intelligent teaching assistant. You have access to the teacher's personal knowledge base.
-Answer the student's question based ONLY on the provided context. If the answer is not in the context, say so clearly.
-Be concise, educational, and cite the source document name when relevant.
+        # 5. Build multimodal prompt parts
+        system_prompt = f"""You are an expert teaching assistant. You have access to the teacher's knowledge base, which includes text documents and visual context.
 
-{f'Recent conversation:{chr(10)}{history_text}' if history_text else ''}
+Answer the student's question based on the provided context. 
+If a visual snippet is provided as an image, analyze it closely.
+Be concise, accurate, and cite the source file name.
+
+Recent conversation history:
+{history_text}
 
 Knowledge Base Context:
 {context}
+"""
+        prompt_parts = [system_prompt]
+        
+        # Add visual content if provided
+        if image_base64:
+            try:
+                # Clean prefix if exists (data:image/png;base64,...)
+                header = "base64,"
+                if header in image_base64:
+                    image_base64 = image_base64.split(header)[1]
+                
+                prompt_parts.append({
+                    "mime_type": "image/png", 
+                    "data": image_base64
+                })
+                prompt_parts.append("\n[Note: The student has selected the visual area provided in the image above for analysis.]")
+            except Exception as e:
+                logger.error(f"Image processing error: {e}")
 
-Student Question: {question}
-
-Answer:"""
+        prompt_parts.append(f"Student Question: {question}")
 
         # 6. Generate answer (offloaded to thread pool — non-blocking)
-        response = await asyncio.to_thread(self._gen_model.generate_content, system_prompt)
+        response = await asyncio.to_thread(self._gen_model.generate_content, prompt_parts)
         answer = response.text.strip()
 
         # 7. Build source list (deduplicated by file)

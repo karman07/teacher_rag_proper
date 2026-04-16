@@ -45,10 +45,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
@@ -78,6 +79,7 @@ class QueryRequest(BaseModel):
     teacher_id:      str
     collection_name: str
     question:        str = Field(..., min_length=3)
+    image_base64:    Optional[str] = None
     top_k:           int = Field(default=6, ge=1, le=20)
     chat_history:    Optional[list[QueryMessage]] = None
 
@@ -151,6 +153,7 @@ async def query_knowledge_base(req: QueryRequest):
             teacher_id=req.teacher_id,
             collection_name=req.collection_name,
             question=req.question,
+            image_base64=req.image_base64,
             top_k=req.top_k,
             chat_history=history,
         )
