@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: teacher_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: securepassword123
+      POSTGRES_DB: teacher_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d teacher_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: teacher_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://admin:securepassword123@db:5432/teacher_db?schema=public
+      - JWT_SECRET=super_secret_for_jwt
+      - PORT=3000
+      - FRONTEND_URL=http://localhost:3001
+      - STUDENT_APP_URL=http://localhost:3002
+      - AI_API_URL=http://ai:8000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: teacher_ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    env_file:
+      - ./ai/.env
+    volumes:
+      - ./ai/chroma_db:/app/chroma_db
+      
+  frontend_new:
+    build:
+      context: ./frontend_new
+      dockerfile: Dockerfile
+    container_name: teacher_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+    depends_on:
+      - backend
+
+  student_new:
+    build:
+      context: ./student_new
+      dockerfile: Dockerfile
+    container_name: teacher_student
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+      - NEXT_PUBLIC_RAG_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+      - ai
+
+volumes:
+  postgres_data:
