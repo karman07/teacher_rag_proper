@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-surface: #ffffff;
+}
+
+:root {
+  --background:     #ffffff;
+  --foreground:     #0f172a;
+  --primary:        #2563eb;
+  --primary-dark:   #1d4ed8;
+  --primary-light:  #eff6ff;
+  --secondary:      #3b82f6;
+  --surface:        #ffffff;
+  --surface-2:      #f8fafc;
+  --surface-3:      #f1f5f9;
+  --card:           #ffffff;
+  --card-border:    #e2e8f0;
+  --card-border-hover: #bfdbfe;
+  --muted:          #64748b;
+  --shadow:         0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-primary: 0 10px 15px -3px rgba(37, 99, 235, 0.2), 0 4px 6px -4px rgba(37, 99, 235, 0.2);
+  --radius-card:    1.25rem;
+}
+
+/* ------- Base ------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ------- Modern Simple Cards ------- */
+.glass-card, .surface-card, .stat-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+}
+
+.glass-card:hover, .surface-card:hover, .stat-card:hover {
+  border-color: var(--card-border-hover);
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.15);
+  transform: translateY(-2px);
+}
+
+/* ------- Backgrounds ------- */
+/* No gradients, pure clean white or off-white */
+.page-bg, .auth-bg {
+  background: var(--surface-2);
+  min-height: 100vh;
+}
+
+/* ------- Typography Utilities ------- */
+.text-muted { color: var(--muted); }
+.label-caps {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* Replaced gradients with solid blue for text */
+.gradient-text {
+  color: var(--primary);
+}
+
+/* ------- Scrollbar ------- */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.scrollbar-none            { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ------- Shimmer / Skeleton ------- */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: var(--surface-3);
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.5s infinite;
+}
+
+/* ------- Float ------- */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+.animate-float { animation: float 5s ease-in-out infinite; }
+
+/* ------- Message Bubbles ------- */
+.bubble-user {
+  background: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.bubble-bot {
+  background: var(--surface-2);
+  border: 1px solid var(--card-border);
+  color: var(--foreground);
+  border-bottom-left-radius: 4px;
+}
+
+/* Input hover overrides */
+input:focus, button:focus {
+  outline: none;
+}
