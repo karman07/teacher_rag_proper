@@ -21,41 +21,96 @@ interface AugmentedMessage extends ChatMessage {
 
 import dynamic from 'next/dynamic';
 
+const renderInline = (text: string, role: 'user' | 'assistant') => {
+  // Split on **bold** and `code` patterns
+  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 bg-blue-100/30 px-1 rounded-md'}`}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-blue-700 font-mono text-xs font-bold">{part.slice(1, -1)}</code>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+};
+
 const MarkdownContent = ({ content, role }: { content: string, role: 'user' | 'assistant' }) => {
+  if (typeof content !== 'string') return null;
   const lines = content.split('\n');
-  return (
-    <div className="space-y-3">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={idx} className="h-1" />;
+  const result: React.ReactNode[] = [];
+  let i = 0;
 
-        // Detect list items: "1. ", "* ", "- ", "1. **"
-        const listMatch = trimmed.match(/^(\d+\.|[*-])\s+(.*)/);
-        const isListItem = !!listMatch;
-        const displayLine = isListItem ? listMatch[2] : trimmed;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
 
-        return (
-          <div key={idx} className={`${isListItem ? 'pl-5 relative' : ''}`}>
-            {isListItem && (
-              <span className={`absolute left-0 font-black ${role === 'user' ? 'text-white/60' : 'text-blue-600'}`}>
-                {listMatch[1]}
-              </span>
-            )}
-            {displayLine.split(/(\*\*.*?\*\*)/g).map((part, pidx) => {
-              if (part.startsWith('**') && part.endsWith('**')) {
-                return (
-                  <strong key={pidx} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 underline decoration-blue-500/20 underline-offset-2'}`}>
-                    {part.slice(2, -2)}
-                  </strong>
-                );
-              }
-              return <span key={pidx}>{part}</span>;
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
+    // Fenced code block
+    if (trimmed.startsWith('```')) {
+      const lang = trimmed.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      result.push(
+        <div key={i} className="my-3 rounded-xl overflow-hidden border border-slate-200">
+          {lang && <div className="px-3 py-1 bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">{lang}</div>}
+          <pre className="p-4 bg-slate-900 text-emerald-300 text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre">{codeLines.join('\n')}</pre>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Empty line
+    if (!trimmed) { result.push(<div key={i} className="h-2" />); i++; continue; }
+
+    // Horizontal rule
+    if (/^-{3,}$/.test(trimmed)) { result.push(<hr key={i} className="border-slate-200 my-3" />); i++; continue; }
+
+    // Headers
+    const headerMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
+    if (headerMatch) {
+      const level = headerMatch[1].length;
+      const sizes = ['text-base', 'text-sm', 'text-xs'];
+      result.push(
+        <div key={i} className={`mt-4 mb-1 font-black tracking-tight ${
+          role === 'user' ? 'text-white' : `text-slate-900 border-l-4 border-blue-600 pl-3 bg-blue-50/50 py-1 rounded-r-lg ${sizes[level - 1]}`
+        }`}>
+          {renderInline(headerMatch[2], role)}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // List items
+    const listMatch = trimmed.match(/^(\d+\.|[*•\-])\s+(.+)/);
+    if (listMatch) {
+      const bullet = listMatch[1];
+      const isNum = /\d+\./.test(bullet);
+      result.push(
+        <div key={i} className="pl-5 relative leading-relaxed">
+          <span className={`absolute left-0 font-black text-sm ${role === 'user' ? 'text-white/60' : 'text-blue-600'}`}>
+            {isNum ? bullet : '•'}
+          </span>
+          <span className="text-sm">{renderInline(listMatch[2], role)}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    result.push(
+      <p key={i} className="leading-relaxed text-sm">{renderInline(trimmed, role)}</p>
+    );
+    i++;
+  }
+
+  return <div className="space-y-2">{result}</div>;
 };
 
 const PDFViewer = dynamic(() => import('./PDFViewer'), { 
@@ -82,10 +137,9 @@ export default function ClassroomPage() {
   const [messages, setMessages]   = useState<AugmentedMessage[]>([]);
   const [input, setInput]         = useState('');
   const [sending, setSending]     = useState(false);
-  const [chatScope, setChatScope] = useState<'all' | 'file'>('all');
+  const [chatScope, setChatScope] = useState<'all' | 'file'>('file');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQ, setSearchQ]     = useState('');
-  const [activeTab, setActiveTab] = useState<'chat' | 'notes'>('chat');
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showDoc, setShowDoc]         = useState(true);
@@ -113,42 +167,42 @@ export default function ClassroomPage() {
   };
 
   const sendMessage = async (overrideQuery?: string, imageBase64?: string) => {
-    console.log('--- sendMessage triggered ---', { overrideQuery: !!overrideQuery, image: !!imageBase64 });
-    const q = overrideQuery || input.trim();
+    // Strict string coercion — prevents [object Object] artifacts
+    const q = typeof overrideQuery === 'string' && overrideQuery.trim()
+      ? overrideQuery.trim()
+      : input.trim();
+
     if ((!q && !imageBase64) || sending) return;
     if (!overrideQuery) setInput('');
 
-    if (imageBase64) {
-      // toast.info("Visual analysis started..."); // If toast exists
-      console.log('Sending visual snippet to AI...');
-    }
-
-    const userMsg: AugmentedMessage = { id: crypto.randomUUID(), role: 'user', content: q || 'Analyze this snippet' };
+    const displayContent = q || 'Analyze this visual snippet';
+    const userMsg: AugmentedMessage = { id: crypto.randomUUID(), role: 'user', content: displayContent };
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
     incrementQuestionsAsked();
 
     try {
       const res = await queryRAG(
-        q,
-        classroom.collectionName,
-        classroom.teacherId,
-        messages.map(({ role, content }) => ({ role, content })),
+        q || '',
+        String(classroom?.collectionName || ''),
+        String(classroom?.teacherId || ''),
+        messages.map(({ role, content }) => ({ role: String(role), content: String(content) })),
         chatScope === 'file' ? selectedFile?.id : undefined,
         imageBase64
       );
       const botMsg: AugmentedMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: res.answer,
+        content: typeof res.answer === 'string' ? res.answer : JSON.stringify(res.answer),
         sources: res.sources,
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch {
+    } catch (err) {
+      console.error('sendMessage error:', err);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: 'Sorry, I ran into an error. Please try again.',
         isError: true,
       }]);
     } finally {
@@ -355,6 +409,8 @@ export default function ClassroomPage() {
                     url={`http://localhost:3000/api/students/files/${selectedFile.id}`} 
                     fileName={selectedFile.displayName || selectedFile.originalName || selectedFile.name || 'Document'} 
                     mimeType={selectedFile.mimeType}
+                    classId={classId}
+                    selectedFileId={selectedFile.id}
                     onClose={() => setShowDoc(false)}
                     onPageChange={setCurrentPage}
                     onSelection={(text, image) => {
@@ -382,34 +438,22 @@ export default function ClassroomPage() {
           <section className="flex-1 flex flex-col rounded-2xl overflow-hidden min-h-[400px] md:min-h-0 bg-white border border-slate-200 shadow-sm relative z-10">
             <div className="px-5 py-4 flex items-center justify-between shrink-0 bg-slate-50 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="flex p-1 rounded-xl bg-slate-200/50 mr-4">
-                  <button 
-                    onClick={() => setActiveTab('chat')}
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                      activeTab === 'chat' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    AI Chat
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('notes')}
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                      activeTab === 'notes' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    Notes
-                  </button>
-                </div>
-                {activeTab === 'chat' && (
-                  <div className="hidden sm:flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">AI Agent Ready</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-600/10 text-blue-600 flex items-center justify-center shadow-inner mr-2">
+                    <Sparkles size={20} />
                   </div>
-                )}
+                  <div>
+                    <h2 className="text-base font-black text-slate-900">AI Learning Assistant</h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active & Ready</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-slate-200/50">
-                {activeTab === 'chat' && (['all', 'file'] as const).map(k => (
+                {(['all', 'file'] as const).map(k => (
                   <button
                     key={k}
                     onClick={() => setChatScope(k)}
@@ -426,112 +470,107 @@ export default function ClassroomPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden relative">
-              <AnimatePresence mode="wait">
-                {activeTab === 'chat' ? (
-                  <motion.div 
-                    key="chat"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="flex flex-col h-full"
-                  >
-                    <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-none bg-slate-50/30">
-              {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center px-6">
-                  <div className="w-20 h-20 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6">
-                    <MessageSquare size={36} />
-                  </div>
-                  <h3 className="text-xl font-black text-slate-900 mb-2">How can I help to clarify?</h3>
-                  <p className="text-sm font-medium text-slate-500 mb-10 max-w-xs">
-                    I can answer questions using {chatScope === 'file' ? 'only the selected document' : 'all available course materials'}.
-                  </p>
-                  <div className="grid gap-3 w-full max-w-sm">
-                    {['Summarize this document', 'What are the key concepts?', 'Quiz me on this topic'].map(prompt => (
-                      <button
-                        key={prompt}
-                        onClick={() => { setInput(prompt); inputRef.current?.focus(); }}
-                        className="px-5 py-4 rounded-2xl text-sm font-bold text-slate-700 text-left bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm flex items-center justify-between group"
+            <div className="flex-1 overflow-hidden relative border-t border-slate-100/50">
+              <div className="flex flex-col h-full bg-slate-50/20">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-none">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center px-10">
+                      <div className="w-20 h-20 rounded-[2rem] bg-blue-600/10 text-blue-600 flex items-center justify-center mb-8 shadow-inner animate-pulse">
+                        <MessageSquare size={32} />
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 mb-2">Engage with your curriculum</h3>
+                      <p className="text-sm font-medium text-slate-500 mb-10 max-w-xs leading-relaxed">
+                        Query {chatScope === 'file' ? 'the active document' : 'the full course library'} for definitions, summaries, or deep dives.
+                      </p>
+                      <div className="grid gap-3 w-full max-w-sm">
+                        {['Summarize key points', 'Explain the core theory', 'What should I study next?'].map((prompt, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { setInput(prompt); inputRef.current?.focus(); }}
+                            className="px-5 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 text-left bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm flex items-center justify-between group"
+                          >
+                            <span>{prompt}</span>
+                            <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-600 transition-transform group-hover:translate-x-1" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    messages.map((msg, i) => (
+                      <motion.div 
+                        key={msg.id} 
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                       >
-                        {prompt}
-                        <ArrowRight size={16} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
-                      </button>
-                    ))}
+                        <div className={`shrink-0 w-9 h-9 rounded-2xl flex items-center justify-center shadow-md ${
+                          msg.role === 'user' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-100 text-blue-600'
+                        }`}>
+                          {msg.role === 'user' ? <User size={18} /> : <Bot size={18} />}
+                        </div>
+                        <div className={`max-w-[85%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                          <div className={`px-6 py-4 text-sm leading-relaxed rounded-3xl shadow-sm border ${
+                            msg.role === 'user' 
+                              ? 'bg-blue-600 border-blue-600 text-white rounded-tr-sm font-bold antialiased' 
+                              : msg.isError 
+                                ? 'bg-red-50 border-red-200 text-red-600 rounded-tl-sm' 
+                                : 'bg-white border-slate-100 text-slate-700 rounded-tl-sm'
+                          }`}>
+                            <MarkdownContent content={msg.content} role={msg.role} />
+                          </div>
+                          {msg.sources && msg.sources.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-1 px-1">
+                              {msg.sources.slice(0, 3).map((s, si) => (
+                                <button 
+                                  key={si} 
+                                  onClick={() => { const f = files.find((f: any) => f.id === s.file_id); if (f) setSelectedFile(f); }} 
+                                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white border border-slate-100 text-slate-500 hover:border-blue-600 hover:text-blue-600 transition-all shadow-xs"
+                                >
+                                  <FileText size={12} /> {s.file_name?.split('/').pop()?.substring(0, 15)}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                  {sending && (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex gap-4">
+                      <div className="shrink-0 w-9 h-9 rounded-2xl flex items-center justify-center bg-white border border-slate-100 text-blue-400">
+                        <Bot size={18} />
+                      </div>
+                      <div className="px-6 py-4 rounded-3xl rounded-tl-sm bg-white border border-slate-100 flex items-center gap-2 shadow-sm">
+                        {[0,1,2].map(i => <div key={i} className="w-2 h-2 rounded-full bg-blue-200 animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />)}
+                      </div>
+                    </motion.div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <div className="p-5 shrink-0 bg-white border-t border-slate-100/50">
+                  <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-slate-50 border-2 border-slate-100 focus-within:border-blue-600 focus-within:bg-white focus-within:shadow-xl focus-within:shadow-blue-500/5 transition-all">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder={chatScope === 'file' ? `Ask about active file…` : 'Type your question…'}
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      className="flex-1 bg-transparent text-sm font-black outline-none text-slate-800 placeholder-slate-400 h-10 tracking-tight"
+                    />
+                    <button 
+                      onClick={sendMessage} 
+                      disabled={sending || !input.trim()} 
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+                        (sending || !input.trim()) ? 'bg-slate-200 text-slate-400' : 'bg-blue-600 text-white shadow-lg hover:bg-blue-700 hover:scale-105 active:scale-95'
+                      }`}
+                    >
+                      {sending ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Send size={20} className="translate-x-[1px]" />}
+                    </button>
                   </div>
                 </div>
-              ) : (
-                messages.map(msg => (
-                  <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>
-                      {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
-                    </div>
-                    <div className={`max-w-[85%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      <div className={`px-5 py-3.5 text-sm leading-relaxed rounded-2xl shadow-sm border ${
-                        msg.role === 'user' ? 'bg-blue-600 border-blue-600 text-white rounded-br-sm font-medium' : msg.isError ? 'bg-red-50 border-red-200 text-red-600 rounded-bl-sm font-medium' : 'bg-white border-slate-200 text-slate-700 rounded-bl-sm'
-                      }`}>
-                        <MarkdownContent content={msg.content} role={msg.role} />
-                      </div>
-                      {msg.sources && msg.sources.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {msg.sources.slice(0, 3).map((s, si) => (
-                            <button key={si} onClick={() => { const f = files.find((f: any) => f.id === s.file_id); if (f) setSelectedFile(f); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-white border border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm">
-                              <FileText size={10} /> {s.file_name?.split('/').pop()?.substring(0, 20)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
-              )}
-              {sending && (
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-                  <div className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center bg-white border border-slate-200 text-slate-400 shadow-sm">
-                    <Bot size={16} />
-                  </div>
-                  <div className="px-5 py-4 rounded-2xl rounded-bl-sm bg-white border border-slate-200 flex items-center gap-1.5 shadow-sm">
-                    {[0,1,2].map(i => <div key={i} className="w-2 h-2 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
-                  </div>
-                </motion.div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-                    <div className="p-4 shrink-0 bg-white border-t border-slate-100">
-                      <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-50 border-2 border-slate-100 focus-within:border-blue-600 focus-within:bg-white transition-all">
-                        <input
-                          ref={inputRef}
-                          type="text"
-                          placeholder={chatScope === 'file' ? `Ask about "${(selectedFile?.displayName || selectedFile?.name || 'this file')?.substring(0, 20)}…"` : 'Type your question…'}
-                          value={input}
-                          onChange={e => setInput(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                          className="flex-1 bg-transparent text-sm font-bold outline-none text-slate-800 placeholder-slate-400 h-10"
-                        />
-                        <button onClick={sendMessage} disabled={sending || !input.trim()} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                          (sending || !input.trim()) ? 'bg-slate-200 text-slate-400' : 'bg-blue-600 text-white shadow-md'
-                        }`}>
-                          {sending ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Send size={18} className="translate-x-[1px]" />}
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    key="notes"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="h-full"
-                  >
-                    <NotesArea 
-                      classId={classId} 
-                      selectedFileId={selectedFile?.id} 
-                      currentPage={currentPage}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              </div>
             </div>
           </section>
         </main>

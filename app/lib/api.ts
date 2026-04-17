@@ -48,8 +48,8 @@ export const studentApi = {
     return res.data;
   },
 
-  createNote: async (subjectId: string, content: string, fileId?: string) => {
-    const res = await axios.post(`${API_URL}/students/classes/${subjectId}/notes`, { content, fileId }, { headers: getAuthHeaders() });
+  createNote: async (subjectId: string, content: string, fileId?: string, pageNumber?: number, selectionText?: string, selectionCoords?: any) => {
+    const res = await axios.post(`${API_URL}/students/classes/${subjectId}/notes`, { content, fileId, pageNumber, selectionText, selectionCoords }, { headers: getAuthHeaders() });
     return res.data;
   },
 

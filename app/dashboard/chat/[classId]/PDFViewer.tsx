@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, ZoomIn, ZoomOut, ExternalLink, Sparkles, X, Download, Image as ImageIcon, FileDigit, Eye, Scissors, Square } from 'lucide-react';
+import { FileText, ZoomIn, ZoomOut, X, Download, Image as ImageIcon, FileDigit, Scissors, Sparkles, Bot, Edit3, Trash2 } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface PDFViewerProps {
@@ -17,85 +16,261 @@ interface PDFViewerProps {
   onClose?: () => void;
   onSelection?: (text: string, image?: string) => void;
   onPageChange?: (page: number) => void;
+  classId?: string;
+  selectedFileId?: string;
 }
 
-export default function PDFViewer({ url, fileName, mimeType = 'application/pdf', onClose, onSelection, onPageChange }: PDFViewerProps) {
-  const [numPages, setNumPages] = useState<number>(0);
+interface SavedNote {
+  id: string;
+  content: string;
+  selectionText: string;
+  pageNumber: number;
+  createdAt: string;
+}
+
+interface SelectionState {
+  text: string;
+  menuX: number;
+  menuY: number;
+}
+
+export default function PDFViewer({
+  url, fileName, mimeType = 'application/pdf',
+  onClose, onSelection, onPageChange, classId, selectedFileId
+}: PDFViewerProps) {
+  const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.2);
-  const [selection, setSelection] = useState('');
-  const [selectionCoords, setSelectionCoords] = useState<{ x: number, y: number } | null>(null);
-  const [snippetMode, setSnippetMode] = useState(false);
-  const [cropBox, setCropBox] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [snippetMode, setSnippetMode] = useState(false);
+  const [cropBox, setCropBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+
+  // Selection & Notes state
+  const [selState, setSelState] = useState<SelectionState | null>(null);
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteAnchor, setNoteAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+  const [allNotes, setAllNotes] = useState<SavedNote[]>([]);
+  const [hoveredNote, setHoveredNote] = useState<SavedNote | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const drawingRef = useRef<{ x: number, y: number } | null>(null);
-  const pageRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
+  const drawingRef = useRef<{ x: number; y: number } | null>(null);
+  const pageRefs = useRef<{ [k: number]: HTMLDivElement | null }>({});
 
   const isPDF = mimeType.includes('pdf');
   const isImage = mimeType.includes('image');
-  const isOffice = mimeType.includes('officedocument') || mimeType.includes('word') || mimeType.includes('presentation') || mimeType.includes('sheet');
-
   const token = typeof window !== 'undefined' ? localStorage.getItem('student-token') : '';
   const authenticatedUrl = `${url}${url.includes('?') ? '&' : '?'}token=${token}`;
 
+  // ── Fetch all notes for this file ─────────────────────────────────────────
+  const fetchNotes = useCallback(async () => {
+    if (!classId) return;
+    try {
+      const res = await fetch(`http://localhost:3000/api/students/classes/${classId}/notes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const fileNotes = (Array.isArray(data) ? data : []).filter(
+        (n: any) => !selectedFileId || n.fileId === selectedFileId
+      );
+      setAllNotes(fileNotes);
+    } catch (e) {
+      console.error('Failed to fetch notes', e);
+    }
+  }, [classId, selectedFileId, token]);
+
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const pageNum = parseInt(entry.target.getAttribute('data-page-number') || '1');
-            setCurrentPage(pageNum);
-            if (onPageChange) onPageChange(pageNum);
-          }
-        });
-      },
-      { threshold: 0.5, root: containerRef.current }
-    );
+    fetchNotes();
+  }, [fetchNotes]);
 
-    Object.values(pageRefs.current).forEach((el) => {
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, [numPages]);
-
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages);
-  }
-
-  // Track text selection
+  // ── Apply highlight marks to text layer after render ──────────────────────
   useEffect(() => {
-    if (!isPDF || snippetMode) return;
-    const handleSelection = () => {
-      const sel = window.getSelection();
-      const selectedText = sel?.toString().trim();
-      
-      if (selectedText && selectedText.length > 3) {
-        setSelection(selectedText);
-        
-        try {
-          const range = sel?.getRangeAt(0);
-          const rect = range?.getBoundingClientRect();
-          if (rect && containerRef.current) {
-            const containerRect = containerRef.current.getBoundingClientRect();
-            setSelectionCoords({
-              x: rect.left - containerRect.left + (rect.width / 2),
-              y: rect.top - containerRect.top - 10
-            });
+    if (!isPDF) return;
+
+    // Small delay to let PDF.js finish rendering text spans
+    const timeout = setTimeout(() => {
+      // Remove all previous highlights
+      document.querySelectorAll('.student-note-highlight').forEach(el => {
+        const parent = el.parentNode;
+        if (parent) {
+          parent.replaceChild(document.createTextNode(el.textContent || ''), el);
+          (parent as any).normalize?.();
+        }
+      });
+
+      // Apply highlights for current page notes
+      const pageNotes = allNotes.filter(n => n.selectionText && n.pageNumber);
+      const pageContainer = pageRefs.current[currentPage];
+      if (!pageContainer) return;
+      const textLayer = pageContainer.querySelector('.react-pdf__Page__textContent');
+      if (!textLayer) return;
+
+      const walker = document.createTreeWalker(textLayer, NodeFilter.SHOW_TEXT);
+      const textNodes: Text[] = [];
+      let node: Text | null;
+      while ((node = walker.nextNode() as Text | null)) {
+        textNodes.push(node);
+      }
+      const fullText = textNodes.map(n => n.textContent || '').join('');
+
+      pageNotes.forEach(note => {
+        const searchText = note.selectionText;
+        if (!searchText) return;
+        const idx = fullText.indexOf(searchText);
+        if (idx === -1) return;
+
+        let charCount = 0;
+        for (const tn of textNodes) {
+          const len = tn.textContent?.length || 0;
+          const start = charCount;
+          const end = charCount + len;
+          if (idx >= start && idx < end) {
+            const range = document.createRange();
+            range.setStart(tn, idx - start);
+            range.setEnd(tn, Math.min(idx - start + searchText.length, len));
+            const mark = document.createElement('mark');
+            mark.className = 'student-note-highlight';
+            mark.dataset.noteId = note.id;
+            mark.dataset.noteContent = note.content;
+            mark.title = note.content;
+            range.surroundContents(mark);
+            break;
           }
-        } catch (e) {}
-      } else {
-        setSelection('');
-        setSelectionCoords(null);
+          charCount += len;
+        }
+      });
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [allNotes, currentPage, isPDF, numPages]);
+
+  // ── Inject highlight CSS once ─────────────────────────────────────────────
+  useEffect(() => {
+    const styleId = 'student-note-highlight-style';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        .student-note-highlight {
+          background: rgba(251, 191, 36, 0.45);
+          border-bottom: 2px solid #f59e0b;
+          border-radius: 2px;
+          cursor: pointer;
+          padding: 0 1px;
+          transition: background 0.15s;
+        }
+        .student-note-highlight:hover {
+          background: rgba(251, 191, 36, 0.7);
+        }
+        .react-pdf__Page__textContent span {
+          cursor: text;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  // ── Delegate click on highlight marks ────────────────────────────────────
+  useEffect(() => {
+    const handleMarkClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest('.student-note-highlight') as HTMLElement | null;
+      if (!target) return;
+      const note = allNotes.find(n => n.id === target.dataset.noteId);
+      if (note) {
+        setHoveredNote(note);
+        setTooltipPos({ x: e.clientX, y: e.clientY - 60 });
       }
     };
-    
-    document.addEventListener('mouseup', handleSelection);
-    return () => document.removeEventListener('mouseup', handleSelection);
-  }, [isPDF, snippetMode]);
+    document.addEventListener('click', handleMarkClick);
+    return () => document.removeEventListener('click', handleMarkClick);
+  }, [allNotes]);
 
+  // ── Page intersection observer ─────────────────────────────────────────────
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const p = parseInt(entry.target.getAttribute('data-page-number') || '1');
+          setCurrentPage(p);
+          onPageChange?.(p);
+        }
+      }),
+      { threshold: 0.5, root: containerRef.current }
+    );
+    Object.values(pageRefs.current).forEach(el => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [numPages, onPageChange]);
+
+  // ── Text selection handler ─────────────────────────────────────────────────
+  const handleMouseUp = useCallback(() => {
+    if (snippetMode) return;
+    const sel = window.getSelection();
+    const text = sel?.toString().trim();
+    if (text && text.length > 2) {
+      const range = sel?.getRangeAt(0);
+      const rect = range?.getBoundingClientRect();
+      if (rect) {
+        setSelState({ text, menuX: rect.left + rect.width / 2, menuY: rect.top - 10 });
+        setAddingNote(false);
+        setNoteAnchor(null);
+      }
+    } else {
+      // Only clear if not in note editor
+      if (!addingNote) setSelState(null);
+    }
+  }, [snippetMode, addingNote]);
+
+  useEffect(() => {
+    if (!isPDF) return;
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => document.removeEventListener('mouseup', handleMouseUp);
+  }, [isPDF, handleMouseUp]);
+
+  // ── Note creation ──────────────────────────────────────────────────────────
+  const handleSaveNote = async () => {
+    if (!noteText.trim() || !classId || !selState) return;
+    setSavingNote(true);
+    try {
+      await fetch(`http://localhost:3000/api/students/classes/${classId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          content: noteText,
+          fileId: selectedFileId,
+          pageNumber: currentPage,
+          selectionText: selState.text,
+        }),
+      });
+      setNoteText('');
+      setAddingNote(false);
+      setSelState(null);
+      setNoteAnchor(null);
+      window.getSelection()?.removeAllRanges();
+      await fetchNotes();
+    } catch (e) {
+      console.error('Failed to save note', e);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3000/api/students/notes/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHoveredNote(null);
+      await fetchNotes();
+    } catch (e) {
+      console.error('Failed to delete note', e);
+    }
+  };
+
+  // ── Snippet capture ────────────────────────────────────────────────────────
   const handleDragDown = (e: React.MouseEvent) => {
     if (!snippetMode) return;
     const rect = containerRef.current?.getBoundingClientRect();
@@ -113,151 +288,101 @@ export default function PDFViewer({ url, fileName, mimeType = 'application/pdf',
     if (!rect) return;
     const curX = e.clientX - rect.left;
     const curY = e.clientY - rect.top + (containerRef.current?.scrollTop || 0);
-    
     setCropBox({
       x: Math.min(drawingRef.current.x, curX),
       y: Math.min(drawingRef.current.y, curY),
       w: Math.abs(curX - drawingRef.current.x),
-      h: Math.abs(curY - drawingRef.current.y)
+      h: Math.abs(curY - drawingRef.current.y),
     });
   };
 
   const handleDragUp = () => {
     if (isDrawing) {
       setIsDrawing(false);
-      // If box is too small, just clear it
-      if (cropBox && (cropBox.w < 10 || cropBox.h < 10)) {
-        setCropBox(null);
-      }
+      if (cropBox && (cropBox.w < 10 || cropBox.h < 10)) setCropBox(null);
     }
   };
 
   const captureSnippet = async () => {
     if (!cropBox || !containerRef.current || isCapturing) return;
-
+    setIsCapturing(true);
     try {
-      setIsCapturing(true);
       const canvases = Array.from(containerRef.current.querySelectorAll('.react-pdf__Page__canvas')) as HTMLCanvasElement[];
-      
-      if (canvases.length === 0) {
-          throw new Error("No PDF canvases found in the viewer.");
-      }
-
+      if (!canvases.length) throw new Error('No canvas found');
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = cropBox.w;
       finalCanvas.height = cropBox.h;
       const ctx = finalCanvas.getContext('2d');
-      if (!ctx) throw new Error("Could not initialize 2D context.");
-
-      canvases.forEach((canvas) => {
+      if (!ctx) throw new Error('No ctx');
+      canvases.forEach(canvas => {
         const rect = canvas.getBoundingClientRect();
-        const containerRect = containerRef.current!.getBoundingClientRect();
-        const canvasX = rect.left - containerRect.left;
-        const canvasY = rect.top - containerRect.top + containerRef.current!.scrollTop;
-
-        const interX = Math.max(cropBox.x, canvasX);
-        const interY = Math.max(cropBox.y, canvasY);
-        const interW = Math.min(cropBox.x + cropBox.w, canvasX + rect.width) - interX;
-        const interH = Math.min(cropBox.y + cropBox.h, canvasY + rect.height) - interY;
-
-        if (interW > 0 && interH > 0) {
+        const cRect = containerRef.current!.getBoundingClientRect();
+        const canvasX = rect.left - cRect.left;
+        const canvasY = rect.top - cRect.top + containerRef.current!.scrollTop;
+        const iX = Math.max(cropBox.x, canvasX);
+        const iY = Math.max(cropBox.y, canvasY);
+        const iW = Math.min(cropBox.x + cropBox.w, canvasX + rect.width) - iX;
+        const iH = Math.min(cropBox.y + cropBox.h, canvasY + rect.height) - iY;
+        if (iW > 0 && iH > 0) {
           const ratio = canvas.width / rect.width;
-          const sx = (interX - canvasX) * ratio;
-          const sy = (interY - canvasY) * ratio;
-          const sw = interW * ratio;
-          const sh = interH * ratio;
-          const dx = interX - cropBox.x;
-          const dy = interY - cropBox.y;
-          ctx.drawImage(canvas, sx, sy, sw, sh, dx, dy, interW, interH);
+          ctx.drawImage(canvas, (iX - canvasX) * ratio, (iY - canvasY) * ratio, iW * ratio, iH * ratio, iX - cropBox.x, iY - cropBox.y, iW, iH);
         }
       });
-
       const base64 = finalCanvas.toDataURL('image/png');
-      if (onSelection) {
-          onSelection(`Analyze this document snippet (Page ${currentPage})`, base64);
-          console.log("Handoff to AI successful");
-      }
+      onSelection?.(`Analyze this document snippet (Page ${currentPage})`, base64);
       setCropBox(null);
       setSnippetMode(false);
     } catch (err) {
-      console.error("Snippet capture failed:", err);
-      alert("Note: Could not capture visual snippet. This can happen if the document server restricts visual access. Please try selecting text instead.");
+      console.error('Snippet capture failed:', err);
+      alert('Could not capture snippet. Try selecting text instead.');
     } finally {
       setIsCapturing(false);
     }
   };
 
-  const renderViewer = () => {
+  // ── Render ─────────────────────────────────────────────────────────────────
+  const renderContent = () => {
     if (isPDF) {
       return (
         <div className="flex flex-col items-center gap-6">
           <Document
             file={authenticatedUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            loading={
-              <div className="py-20 flex flex-col items-center gap-4">
-                <div className="w-12 h-12 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
-                <p className="label-caps text-slate-400">Loading curriculum…</p>
-              </div>
-            }
-            error={
-              <div className="py-20 text-center">
-                <p className="text-sm font-bold text-red-500">Failed to load PDF</p>
-                <p className="text-xs text-slate-500 mt-1">Please try refreshing the page</p>
-              </div>
-            }
+            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+            loading={<div className="py-20 text-slate-400 text-sm font-bold animate-pulse">Loading document…</div>}
           >
-            {Array.from(new Array(numPages), (el, index) => (
-              <div 
-                key={`page_${index + 1}`} 
-                ref={el => { pageRefs.current[index + 1] = el }}
-                data-page-number={index + 1}
-                className="relative group mb-6"
+            {Array.from(new Array(numPages), (_, i) => (
+              <div
+                key={i + 1}
+                ref={el => { pageRefs.current[i + 1] = el; }}
+                data-page-number={i + 1}
+                className="relative mb-6"
               >
                 <Page
-                  pageNumber={index + 1}
+                  pageNumber={i + 1}
                   scale={scale}
-                  renderAnnotationLayer={true}
-                  renderTextLayer={true}
-                  className="shadow-xl"
+                  renderAnnotationLayer
+                  renderTextLayer
+                  className="shadow-2xl rounded-sm"
                 />
-                <div className="absolute -left-12 top-0 h-full hidden lg:flex items-start pt-4">
-                  <span className="text-[10px] font-black text-slate-300 transform -rotate-90 origin-top-left">PAGE {index + 1}</span>
-                </div>
               </div>
             ))}
           </Document>
         </div>
       );
     }
-
     if (isImage) {
       return (
         <div className="flex flex-col items-center p-4">
-          <img 
-            src={authenticatedUrl} 
-            alt={fileName} 
-            className="max-w-full h-auto rounded-lg shadow-2xl border border-slate-200"
-            style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
-          />
+          <img src={authenticatedUrl} alt={fileName} className="max-w-full h-auto rounded-lg shadow-2xl" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
         </div>
       );
     }
-
     return (
       <div className="h-full flex flex-col items-center justify-center py-20 px-10 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6 shadow-sm border border-blue-100">
-          <FileDigit size={36} />
-        </div>
-        <h3 className="text-xl font-black text-slate-900 mb-2">{fileName}</h3>
-        <p className="text-sm font-medium text-slate-500 mb-8 max-w-xs">
-          This file type ({mimeType.split('/').pop()?.toUpperCase()}) is best viewed by downloading.
-        </p>
-        <button 
-          onClick={() => window.open(authenticatedUrl, '_blank')}
-          className="px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-blue-700 transition-all shadow-lg active:scale-95"
-        >
-          <Download size={18} /> Download and View
+        <FileDigit size={40} className="text-blue-600 mb-6" />
+        <h3 className="text-lg font-black text-slate-900 mb-4">{fileName}</h3>
+        <button onClick={() => window.open(authenticatedUrl, '_blank')} className="px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-blue-700 transition-all shadow-lg active:scale-95">
+          <Download size={18} /> Download & View
         </button>
       </div>
     );
@@ -265,159 +390,225 @@ export default function PDFViewer({ url, fileName, mimeType = 'application/pdf',
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm relative">
-      <style>{`
-        .react-pdf__Page__textContent { opacity: 0.15; }
-        .react-pdf__Page__canvas { margin: 0 auto; box-shadow: 0 4px 20px -5px rgba(0,0,0,0.1); border-radius: 4px; }
-        .pdf-scroll-container::-webkit-scrollbar { width: 6px; }
-        .pdf-scroll-container::-webkit-scrollbar-track { background: transparent; }
-        .pdf-scroll-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .pdf-scroll-container::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-      `}</style>
-
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-slate-100 bg-slate-50 z-20">
+      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-slate-100 bg-slate-50/80 z-20">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2 rounded-xl shrink-0 bg-blue-100 text-blue-600">
+          <div className="p-2 rounded-xl bg-blue-100 text-blue-600 shrink-0">
             {isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
           </div>
-          <span className="text-sm font-bold truncate max-w-[200px] text-slate-800" title={fileName}>{fileName}</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-sm mr-2">
-            <button 
-              onClick={() => { setSnippetMode(!snippetMode); setSelection(''); setCropBox(null); }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${
-                snippetMode ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-blue-600'
-              }`}
-              title="Snippet Tool (Select Area)"
-            >
-              <Scissors size={14} />
-              <span>Snippet</span>
-            </button>
-          </div>
-          {(isPDF || isImage) && (
-            <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-              <ToolBtn onClick={() => setScale(s => Math.max(0.5, s - 0.1))} title="Zoom out"><ZoomOut size={16} /></ToolBtn>
-              <span className="text-[10px] font-black w-10 text-center text-slate-600">{Math.round(scale * 100)}%</span>
-              <ToolBtn onClick={() => setScale(s => Math.min(2.5, s + 0.1))} title="Zoom in"><ZoomIn size={16} /></ToolBtn>
-            </div>
-          )}
-          <div className="w-px h-4 bg-slate-200" />
-          <div className="flex items-center gap-1.5">
-            <button 
-              onClick={() => window.open(authenticatedUrl, '_blank')}
-              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors shadow-sm"
-              title="Download/Open"
-            >
-              <Download size={16} />
-            </button>
-            {onClose && (
-              <button 
-                onClick={onClose}
-                className="p-2 rounded-lg bg-red-50 border border-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm group"
-                title="Close Viewer"
-              >
-                <X size={16} className="group-active:scale-90 transition-transform" />
-              </button>
+          <div className="min-w-0">
+            <span className="text-sm font-bold truncate block max-w-[180px] text-slate-800" title={fileName}>{fileName}</span>
+            {allNotes.length > 0 && (
+              <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                {allNotes.filter(n => n.pageNumber === currentPage).length} note{allNotes.filter(n => n.pageNumber === currentPage).length !== 1 ? 's' : ''} on this page
+              </span>
             )}
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          {/* Snippet tool */}
+          <button
+            onClick={() => { setSnippetMode(s => !s); setSelState(null); setCropBox(null); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${snippetMode ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-blue-600'}`}
+            title="Capture Visual Snippet"
+          >
+            <Scissors size={13} /> Snippet
+          </button>
+
+          {/* Zoom */}
+          {(isPDF || isImage) && (
+            <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+              <ToolBtn onClick={() => setScale(s => Math.max(0.5, s - 0.1))} title="Zoom out"><ZoomOut size={15} /></ToolBtn>
+              <span className="text-[10px] font-black w-9 text-center text-slate-600">{Math.round(scale * 100)}%</span>
+              <ToolBtn onClick={() => setScale(s => Math.min(3, s + 0.1))} title="Zoom in"><ZoomIn size={15} /></ToolBtn>
+            </div>
+          )}
+
+          <button onClick={() => window.open(authenticatedUrl, '_blank')} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 transition-colors" title="Open in new tab">
+            <Download size={15} />
+          </button>
+          {onClose && (
+            <button onClick={onClose} className="p-2 rounded-lg bg-red-50 border border-red-100 text-red-400 hover:bg-red-500 hover:text-white transition-all" title="Close">
+              <X size={15} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Floating Selection Indicator (Context Menu Style) */}
-      <AnimatePresence>
-        {selection && selectionCoords && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8, y: 10 }} 
-            animate={{ opacity: 1, scale: 1, y: 0 }} 
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute z-50 pointer-events-none"
-            style={{ 
-              left: Math.max(10, Math.min(selectionCoords.x, (containerRef.current?.offsetWidth || 0) - 150)), 
-              top: selectionCoords.y - 60 
-            }}
+      {/* Viewer area */}
+      <div
+        ref={containerRef}
+        onMouseDown={handleDragDown}
+        onMouseMove={handleDragMove}
+        onMouseUp={handleDragUp}
+        className={`flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100/50 relative ${snippetMode ? 'cursor-crosshair select-none' : ''}`}
+      >
+        <div className={snippetMode ? 'pointer-events-none' : ''}>
+          {renderContent()}
+        </div>
+
+        {/* Crop box */}
+        {cropBox && (
+          <div
+            className="absolute border-2 border-blue-600 bg-blue-500/10 pointer-events-none z-20 rounded-sm"
+            style={{ left: cropBox.x, top: cropBox.y, width: cropBox.w, height: cropBox.h, borderStyle: 'dashed' }}
           >
-            <div className="pointer-events-auto bg-slate-900 text-white rounded-xl shadow-2xl border border-white/10 flex items-center overflow-hidden h-12 shadow-blue-500/10 backdrop-blur-md">
-              <div className="flex items-center gap-2 px-3 border-r border-white/10 bg-white/5 h-full">
-                <Sparkles size={14} className="text-blue-400" />
-                <span className="text-[9px] font-black uppercase tracking-tighter text-blue-300">Smart Tool</span>
+            {!isDrawing && (
+              <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-auto">
+                <button
+                  onClick={captureSnippet}
+                  disabled={isCapturing}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2 hover:bg-blue-600 transition-all disabled:opacity-50"
+                >
+                  {isCapturing ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Sparkles size={14} className="text-blue-400" />}
+                  {isCapturing ? 'Analyzing…' : 'Analyze Snippet'}
+                </button>
+                <button onClick={() => setCropBox(null)} className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-500 shadow-xl transition-all">
+                  <X size={15} />
+                </button>
               </div>
-              
-              <button 
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Floating Selection Context Menu ───────────────────────────────── */}
+      <AnimatePresence>
+        {selState && !addingNote && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: 6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.85, y: 6 }}
+            className="fixed z-[200] pointer-events-auto"
+            style={{ left: selState.menuX - 120, top: selState.menuY - 52 }}
+          >
+            <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-white/10 flex overflow-hidden">
+              <button
                 onClick={() => {
-                  if (onSelection) onSelection(selection);
-                  setSelection('');
-                  setSelectionCoords(null);
+                  onSelection?.(selState.text);
+                  setSelState(null);
                   window.getSelection()?.removeAllRanges();
                 }}
-                className="px-4 h-full text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-colors flex items-center gap-2 border-r border-white/5"
+                className="flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-300 hover:bg-white/10 transition-colors border-r border-white/10"
               >
-                Explain with AI
+                <Sparkles size={13} /> Analyze
               </button>
-
-              <button 
-                onClick={() => { setSelection(''); setSelectionCoords(null); window.getSelection()?.removeAllRanges(); }} 
-                className="px-3 h-full hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all flex items-center justify-center"
+              <button
+                onClick={() => {
+                  // anchor the note editor to the cursor area
+                  const containerRect = containerRef.current?.getBoundingClientRect();
+                  if (containerRect) {
+                    setNoteAnchor({
+                      x: Math.min(selState.menuX - containerRect.left, (containerRect.width || 300) - 270),
+                      y: selState.menuY - containerRect.top + 20 + (containerRef.current?.scrollTop || 0),
+                    });
+                  }
+                  setAddingNote(true);
+                }}
+                className="flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-white/10 transition-colors border-r border-white/10"
               >
-                <X size={16} />
+                <Edit3 size={13} /> Note
+              </button>
+              <button
+                onClick={() => {
+                  onSelection?.(`Explain this passage in detail: "${selState.text}"`);
+                  setSelState(null);
+                  window.getSelection()?.removeAllRanges();
+                }}
+                className="flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-emerald-300 hover:bg-white/10 transition-colors border-r border-white/10"
+              >
+                <Bot size={13} /> Ask AI
+              </button>
+              <button
+                onClick={() => { setSelState(null); window.getSelection()?.removeAllRanges(); }}
+                className="px-3 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <X size={14} />
               </button>
             </div>
-            {/* Pointer arrow */}
-            <div className="w-3 h-3 bg-slate-900 border-r border-b border-white/10 transform rotate-45 mx-auto -mt-1.5" />
+            {/* caret */}
+            <div className="w-3 h-3 bg-slate-900 transform rotate-45 border-r border-b border-white/10 mx-auto -mt-[7px] relative z-[-1]" />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Viewer Area */}
-      <div 
-        ref={containerRef} 
-        onMouseDown={handleDragDown}
-        onMouseMove={handleDragMove}
-        onMouseUp={handleDragUp}
-        className={`flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100/50 pdf-scroll-container scroll-auto relative ${snippetMode ? 'cursor-crosshair' : ''}`}
-      >
-        <div className={snippetMode ? 'pointer-events-none' : ''}>
-          {renderViewer()}
-        </div>
-        
-        {/* Visual Crop Box Overlay */}
-        {cropBox && (
-          <div 
-            className="absolute border-2 border-blue-600 bg-blue-500/10 pointer-events-none z-10 rounded-sm"
-            style={{ 
-              left: cropBox.x, 
-              top: cropBox.y, 
-              width: cropBox.w, 
-              height: cropBox.h,
-              borderStyle: 'dashed'
-            }}
+      {/* ── Floating Note Editor ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {addingNote && selState && noteAnchor && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute z-[200] bg-white rounded-2xl shadow-2xl border-2 border-amber-400 p-4 w-64"
+            style={{ left: noteAnchor.x, top: noteAnchor.y }}
           >
-            {!isDrawing && (
-              <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-auto">
-                <button 
-                  onClick={captureSnippet}
-                  disabled={isCapturing}
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2 hover:bg-blue-600 transition-all border border-white/10 disabled:opacity-50"
-                >
-                  {isCapturing ? (
-                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  ) : (
-                    <Sparkles size={14} className="text-blue-400" />
-                  )}
-                  {isCapturing ? 'Analyzing…' : 'Analyze Snippet'}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Pin Note</span>
+              </div>
+              <button onClick={() => { setAddingNote(false); setSelState(null); setNoteAnchor(null); window.getSelection()?.removeAllRanges(); }}>
+                <X size={14} className="text-slate-300 hover:text-red-400 transition-colors" />
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 italic mb-3 border-l-2 border-amber-200 pl-2 line-clamp-2">
+              "{selState.text}"
+            </p>
+            <textarea
+              autoFocus
+              value={noteText}
+              onChange={e => setNoteText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) handleSaveNote(); }}
+              placeholder="Write your insight… (Ctrl+Enter to save)"
+              className="w-full h-24 bg-slate-50 rounded-xl p-3 text-xs font-bold outline-none border border-transparent focus:border-amber-300 focus:bg-white transition-all text-slate-800 resize-none"
+            />
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => { setAddingNote(false); setSelState(null); setNoteAnchor(null); }} className="flex-1 py-2 rounded-lg border border-slate-200 text-[10px] font-black text-slate-400 uppercase hover:text-slate-600 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNote}
+                disabled={savingNote || !noteText.trim()}
+                className="flex-1 py-2.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+              >
+                {savingNote ? 'Saving…' : 'Pin ✦'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Note Tooltip (click on highlight) ─────────────────────────────── */}
+      <AnimatePresence>
+        {hoveredNote && tooltipPos && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="fixed z-[300] bg-slate-900 text-white rounded-2xl shadow-2xl border border-white/10 p-4 max-w-xs"
+            style={{ left: Math.min(tooltipPos.x, window.innerWidth - 320), top: tooltipPos.y }}
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Your Note · Page {hoveredNote.pageNumber}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => handleDeleteNote(hoveredNote.id)} className="p-1 rounded-md hover:bg-red-500/20 text-red-400 transition-colors" title="Delete note">
+                  <Trash2 size={13} />
                 </button>
-                <button 
-                  onClick={() => setCropBox(null)}
-                  className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-500 shadow-xl transition-all"
-                >
-                  <X size={16} />
+                <button onClick={() => setHoveredNote(null)} className="p-1 rounded-md hover:bg-white/10 text-slate-400 transition-colors">
+                  <X size={13} />
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+            <p className="text-xs text-slate-400 italic mb-2 border-l-2 border-amber-400/40 pl-2 line-clamp-1">"{hoveredNote.selectionText}"</p>
+            <p className="text-sm font-bold text-white leading-relaxed">{hoveredNote.content}</p>
+            <p className="text-[9px] text-slate-500 mt-2">{new Date(hoveredNote.createdAt).toLocaleDateString()}</p>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -428,7 +619,7 @@ function ToolBtn({ children, onClick, disabled, title }: { children: React.React
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${disabled ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100'}`}
+      className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${disabled ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'}`}
     >
       {children}
     </button>

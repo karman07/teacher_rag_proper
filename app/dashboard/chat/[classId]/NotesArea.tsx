@@ -61,8 +61,7 @@ export default function NotesArea({ classId, selectedFileId, currentPage }: Note
       if (editingNote) {
         await studentApi.updateNote(editingNote.id, newNoteContent);
       } else {
-        // We need to update api.ts to support pageNumber in createNote
-        await axios.post(`http://localhost:3000/api/students/classes/${classId}/notes`, payload, { headers: { Authorization: `Bearer ${localStorage.getItem('student-token')}` } });
+        await studentApi.createNote(classId, newNoteContent, selectedFileId, currentPage);
       }
       setNewNoteContent('');
       setEditingNote(null);
