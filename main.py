@@ -88,6 +88,11 @@ class SourceDoc(BaseModel):
     file_id:   str
     file_name: str
     relevance: float
+    chunk_idx: Optional[int] = None
+    page: Optional[int] = None
+    image_index: Optional[int] = None
+    content_type: Optional[str] = None
+    snippet: Optional[str] = None
 
 
 class QueryResponse(BaseModel):

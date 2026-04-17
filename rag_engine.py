@@ -9,8 +9,10 @@ Architecture:
 """
 
 import os
+import io
 import re
 import asyncio
+import base64
 import hashlib
 import logging
 from typing import Optional
@@ -18,6 +20,15 @@ from typing import Optional
 import chromadb
 import google.generativeai as genai
 from chromadb.config import Settings as ChromaSettings
+
+try:
+    from PIL import Image, ImageStat
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+except Exception:
+    Image = None
+    ImageStat = None
+    BlipProcessor = None
+    BlipForConditionalGeneration = None
 
 from config import get_settings
 from document_parser import parse_document
@@ -43,7 +54,8 @@ class RAGEngine:
         # Configure Gemini
         genai.configure(api_key=cfg.gemini_api_key)
         self._embed_model = "models/gemini-embedding-001"
-        self._gen_model   = genai.GenerativeModel("gemini-1.5-flash")
+        self._gen_model   = genai.GenerativeModel("gemini-2.5-flash")
+        self._vision_model = genai.GenerativeModel(cfg.vision_model_name)
 
         # ChromaDB persistent client
         os.makedirs(cfg.chroma_persist_dir, exist_ok=True)
@@ -53,10 +65,19 @@ class RAGEngine:
         )
 
         self._uploads_root = cfg.uploads_root
+        self._image_caption_backend = cfg.image_caption_backend.lower()
+        self._blip_model_name = cfg.blip_model_name
+        self._pdf_max_pages = cfg.pdf_max_pages
+        self._pdf_max_images_per_page = cfg.pdf_max_images_per_page
+        self._pdf_min_image_area = cfg.pdf_min_image_area
+        self._pdf_vision_concurrency = cfg.pdf_vision_concurrency
+        self._blip_processor = None
+        self._blip_model = None
         logger.info("RAGEngine initialised — Gemini + ChromaDB ready")
+        logger.info(f"Image caption backend: {self._image_caption_backend}")
 
     # ─── Public: Ingest ────────────────────────────────────────────────────────
-    async def _describe_visual_content(self, file_path: str, mime_type: str) -> str:
+    async def _describe_with_gemini(self, file_path: str, mime_type: str) -> str:
         """Use Gemini Vision to describe an image, graph, or chart."""
         logger.info(f"[vision] describing {mime_type} at {file_path}")
         try:
@@ -65,9 +86,10 @@ class RAGEngine:
             
             # Use current gen_model (Gemini Flash) for vision
             prompt = (
-                "You are an expert academic assistant. Describe this image, graph, or chart in thorough detail. "
-                "Include all text found, explain trends in graphs, and describe visual relationships. "
-                "The output will be used for a RAG knowledge base to help students learn."
+                "You are extracting visual knowledge for RAG. "
+                "Return a concise summary in under 120 words. "
+                "Include: visible text/labels, chart/table type, main trend or relationship, and key values if clearly readable. "
+                "Avoid repetition and avoid speculation."
             )
             contents = [
                 prompt,
@@ -75,11 +97,240 @@ class RAGEngine:
             ]
             
             # Using asyncio to thread since SDK might be sync
-            response = await asyncio.to_thread(self._gen_model.generate_content, contents)
+            response = await asyncio.to_thread(self._vision_model.generate_content, contents)
             return response.text.strip()
         except Exception as e:
             logger.error(f"[vision] failed to describe {file_path}: {e}")
             return ""
+
+    def _ensure_blip_loaded(self) -> None:
+        """Lazy-load BLIP only when requested to keep startup fast."""
+        if self._blip_processor is not None and self._blip_model is not None:
+            return
+
+        if not Image or not BlipProcessor or not BlipForConditionalGeneration:
+            raise RuntimeError(
+                "BLIP dependencies not available. Install transformers, pillow, and torch."
+            )
+
+        self._blip_processor = BlipProcessor.from_pretrained(self._blip_model_name)
+        self._blip_model = BlipForConditionalGeneration.from_pretrained(self._blip_model_name)
+
+    def _describe_with_blip_sync(self, file_path: str) -> str:
+        import torch
+
+        self._ensure_blip_loaded()
+
+        raw_image = Image.open(file_path).convert("RGB")
+        # Use image-only captioning for BLIP base model; prompting here can cause
+        # instruction echo instead of an actual visual description.
+        inputs = self._blip_processor(images=raw_image, return_tensors="pt")
+
+        with torch.no_grad():
+            output = self._blip_model.generate(
+                **inputs,
+                max_new_tokens=160,
+                num_beams=5,
+                do_sample=False,
+            )
+
+        return self._blip_processor.decode(output[0], skip_special_tokens=True).strip()
+
+    async def _describe_with_blip(self, file_path: str) -> str:
+        logger.info(f"[blip] generating image caption for {file_path}")
+        try:
+            return await asyncio.to_thread(self._describe_with_blip_sync, file_path)
+        except Exception as e:
+            logger.error(f"[blip] failed to describe {file_path}: {e}")
+            return ""
+
+    async def _describe_visual_content(self, file_path: str, mime_type: str) -> str:
+        """Describe visual content using configured backend with fallback."""
+        if self._image_caption_backend == "blip":
+            description = await self._describe_with_blip(file_path)
+            if description:
+                return description
+
+            logger.warning("[blip] caption empty, falling back to Gemini Vision")
+
+        return await self._describe_with_gemini(file_path, mime_type)
+
+    async def _extract_pdf_image_unit(
+        self,
+        *,
+        file_name: str,
+        page_num: int,
+        image_index: int,
+        image_bytes: bytes,
+        image_ext: str,
+        vision_cache: dict[str, str],
+        semaphore: asyncio.Semaphore,
+    ) -> Optional[dict]:
+        """Describe one PDF image and return a classified unit."""
+        import tempfile
+
+        image_hash = hashlib.sha1(image_bytes).hexdigest()
+        cached = vision_cache.get(image_hash)
+        if cached:
+            description = cached
+        else:
+            suffix = f".{image_ext}" if image_ext else ".png"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(image_bytes)
+                img_path = tmp.name
+
+            try:
+                mime = f"image/{image_ext}" if image_ext else "image/png"
+                if image_ext == "jpg":
+                    mime = "image/jpeg"
+
+                async with semaphore:
+                    description = await self._describe_visual_content(img_path, mime)
+
+                if description:
+                    vision_cache[image_hash] = description
+            finally:
+                try:
+                    if os.path.exists(img_path):
+                        os.remove(img_path)
+                except Exception:
+                    pass
+
+        if not description:
+            return None
+
+        return {
+            "kind": "pdf_image",
+            "page": page_num,
+            "image_index": image_index,
+            "content": (
+                f"[Source: {file_name} (PDF)]\n"
+                f"[Classification: Image | Page {page_num} | Image {image_index}]\n"
+                f"{description}"
+            ),
+        }
+
+    def _is_meaningful_image_bytes(self, image_bytes: bytes) -> bool:
+        """Filter out likely masks/blank assets that are common in PDFs."""
+        if not Image or not ImageStat:
+            return True
+
+        try:
+            img = Image.open(io.BytesIO(image_bytes)).convert("L")
+            width, height = img.size
+            if width * height < self._pdf_min_image_area:
+                return False
+
+            extrema = img.getextrema()
+            dynamic_range = float(extrema[1] - extrema[0])
+            stddev = float(ImageStat.Stat(img).stddev[0])
+
+            # Near-flat images are typically separators, masks, or blank regions.
+            if dynamic_range < 16 or stddev < 8:
+                return False
+            return True
+        except Exception:
+            return True
+
+    async def _extract_pdf_units(self, file_path: str, file_name: str) -> list[dict]:
+        """Classify PDF content into text and image units for independent chunking."""
+        import fitz
+
+        units: list[dict] = []
+        doc = fitz.open(file_path)
+        total_pages = min(len(doc), self._pdf_max_pages)
+        vision_cache: dict[str, str] = {}
+        seen_image_hashes: set[str] = set()
+        image_tasks = []
+        semaphore = asyncio.Semaphore(max(1, self._pdf_vision_concurrency))
+
+        try:
+            for page_idx in range(total_pages):
+                page = doc[page_idx]
+                page_num = page_idx + 1
+
+                page_text = (page.get_text("text") or "").strip()
+                if page_text:
+                    units.append({
+                        "kind": "pdf_text",
+                        "page": page_num,
+                        "content": (
+                            f"[Source: {file_name} (PDF)]\n"
+                            f"[Classification: Text | Page {page_num}]\n"
+                            f"{page_text}"
+                        ),
+                    })
+
+                page_dict = page.get_text("dict")
+                blocks = page_dict.get("blocks") or []
+                candidates = []
+                for image_idx, block in enumerate(blocks, start=1):
+                    if block.get("type") != 1:
+                        continue
+
+                    image_bytes = block.get("image")
+                    if not image_bytes:
+                        continue
+
+                    bbox = block.get("bbox") or [0, 0, 0, 0]
+                    displayed_w = max(0.0, float(bbox[2]) - float(bbox[0]))
+                    displayed_h = max(0.0, float(bbox[3]) - float(bbox[1]))
+                    displayed_area = displayed_w * displayed_h
+
+                    width = int(block.get("width") or 0)
+                    height = int(block.get("height") or 0)
+                    pixel_area = width * height
+
+                    if max(displayed_area, pixel_area) < self._pdf_min_image_area:
+                        continue
+                    if not self._is_meaningful_image_bytes(image_bytes):
+                        continue
+
+                    image_hash = hashlib.sha1(image_bytes).hexdigest()
+                    if image_hash in seen_image_hashes:
+                        continue
+                    seen_image_hashes.add(image_hash)
+
+                    image_ext = (block.get("ext") or "png").lower()
+                    candidates.append((image_idx, image_bytes, image_ext, max(displayed_area, pixel_area)))
+
+                # Prioritize large visuals (charts/diagrams), skip tiny icons.
+                candidates.sort(key=lambda x: x[3], reverse=True)
+                candidates = candidates[: max(0, self._pdf_max_images_per_page)]
+
+                for image_idx, image_bytes, image_ext, _ in candidates:
+                    try:
+                        image_tasks.append(
+                            self._extract_pdf_image_unit(
+                                file_name=file_name,
+                                page_num=page_num,
+                                image_index=image_idx,
+                                image_bytes=image_bytes,
+                                image_ext=image_ext,
+                                vision_cache=vision_cache,
+                                semaphore=semaphore,
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "[ingest] Failed to process PDF image block on page %s (image %s): %s",
+                            page_num,
+                            image_idx,
+                            e,
+                        )
+
+            if image_tasks:
+                described_units = await asyncio.gather(*image_tasks, return_exceptions=True)
+                for item in described_units:
+                    if isinstance(item, Exception):
+                        logger.warning("[ingest] PDF image description task failed: %s", item)
+                        continue
+                    if item:
+                        units.append(item)
+        finally:
+            doc.close()
+
+        return units
 
     async def ingest_file(
         self,
@@ -97,47 +348,51 @@ class RAGEngine:
         logger.info(f"[ingest] teacher={teacher_id} file={file_name}")
 
         ext = os.path.splitext(file_path)[1].lower()
-        text = ""
+        units: list[dict] = []
 
         # 1. Handle Images directly
-        if ext in ('.png', '.jpg', '.jpeg', '.webp'):
+        if ext in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tif', '.tiff'):
             mime = f"image/{ext[1:] if ext != '.jpg' else 'jpeg'}"
             visual_desc = await self._describe_visual_content(file_path, mime)
-            text = f"[Source: {file_name} (Image)]\n\n{visual_desc}"
+            units.append({
+                "kind": "image",
+                "page": None,
+                "content": (
+                    f"[Source: {file_name} (Image)]\n"
+                    "[Classification: Image]\n"
+                    f"{visual_desc}"
+                ),
+            })
+        elif ext == '.pdf':
+            units = await self._extract_pdf_units(file_path, file_name)
         else:
             # 2. Parse standard document
             text = parse_document(file_path)
-            
-            # 3. Special handling for PDFs: Look for graphs/images if text is thin
-            if ext == '.pdf' and (not text or len(text.strip()) < 200):
-                logger.info(f"[ingest] Low text density in PDF {file_name}, using Vision OCR")
-                try:
-                    import fitz
-                    doc = fitz.open(file_path)
-                    ocr_texts = []
-                    # Just do the first 5 pages to avoid cost/time if it's huge, 
-                    # but usually educational PDFs are focused.
-                    for i in range(min(len(doc), 10)):
-                        page = doc[i]
-                        pix = page.get_pixmap()
-                        img_path = f"{file_path}_p{i}.png"
-                        pix.save(img_path)
-                        page_desc = await self._describe_visual_content(img_path, "image/png")
-                        if page_desc:
-                            ocr_texts.append(f"[Page {i+1} Visual Analysis]:\n{page_desc}")
-                        if os.path.exists(img_path): os.remove(img_path)
-                    
-                    if ocr_texts:
-                        text += "\n\n" + "\n\n".join(ocr_texts)
-                except Exception as e:
-                    logger.warning(f"[ingest] PDF Vision fallback failed: {e}")
+            units.append({
+                "kind": "document_text",
+                "page": None,
+                "content": f"[Source: {file_name}]\n[Classification: Text]\n{text}",
+            })
 
-        if not text.strip():
+        units = [u for u in units if (u.get("content") or "").strip()]
+        if not units:
             raise ValueError(f"No extractable content (text or visual) in {file_name}")
 
-        # 2. Chunk
-        chunks = self._chunk_text(text)
-        logger.info(f"[ingest] {len(chunks)} chunks from '{file_name}'")
+        # 2. Chunk classified units independently
+        chunk_records: list[tuple[str, dict]] = []
+        for unit in units:
+            if unit.get("kind") in ("image", "pdf_image"):
+                # Keep one chunk per visual unit for predictable counts and source mapping.
+                chunk_records.append((unit["content"], unit))
+            else:
+                unit_chunks = self._chunk_text(unit["content"], min_len=50)
+                for chunk in unit_chunks:
+                    chunk_records.append((chunk, unit))
+
+        if not chunk_records:
+            raise ValueError(f"No chunkable content generated for {file_name}")
+
+        logger.info(f"[ingest] %s chunks from '%s'", len(chunk_records), file_name)
 
         # 3. Get/create collection (teacher-isolated)
         col = self._chroma.get_or_create_collection(
@@ -149,7 +404,7 @@ class RAGEngine:
         batch_size = 100
         ids, docs, metas = [], [], []
 
-        for i, chunk in enumerate(chunks):
+        for i, (chunk, unit) in enumerate(chunk_records):
             chunk_id = f"{file_id}_chunk_{i}"
             # Deduplicate by chunk_id (upsert handles re-ingestion)
             ids.append(chunk_id)
@@ -159,6 +414,9 @@ class RAGEngine:
                 "file_name": file_name,
                 "chunk_idx": i,
                 "teacher_id": teacher_id,
+                "content_type": unit.get("kind", "unknown"),
+                "page": int(unit.get("page") or -1),
+                "image_index": int(unit.get("image_index") or -1),
             })
 
         for start in range(0, len(ids), batch_size):
@@ -176,8 +434,8 @@ class RAGEngine:
                 embeddings=embeddings,
             )
 
-        logger.info(f"[ingest] {len(chunks)} chunks upserted for file {file_id}")
-        return {"chunks_added": len(chunks), "file_id": file_id}
+        logger.info(f"[ingest] {len(chunk_records)} chunks upserted for file {file_id}")
+        return {"chunks_added": len(chunk_records), "file_id": file_id}
 
     # ─── Public: Delete ────────────────────────────────────────────────────────
 
@@ -283,10 +541,12 @@ Knowledge Base Context:
                 header = "base64,"
                 if header in image_base64:
                     image_base64 = image_base64.split(header)[1]
+
+                image_bytes = base64.b64decode(image_base64)
                 
                 prompt_parts.append({
                     "mime_type": "image/png", 
-                    "data": image_base64
+                    "data": image_bytes
                 })
                 prompt_parts.append("\n[Note: The student has selected the visual area provided in the image above for analysis.]")
             except Exception as e:
@@ -298,24 +558,37 @@ Knowledge Base Context:
         response = await asyncio.to_thread(self._gen_model.generate_content, prompt_parts)
         answer = response.text.strip()
 
-        # 7. Build source list (deduplicated by file)
-        seen_files = set()
+        # 7. Build source list with chunk-level references for frontend citations.
+        seen_refs = set()
         sources = []
-        for meta, dist in zip(metadatas, distances):
+        for chunk, meta, dist in zip(chunks, metadatas, distances):
             fid = meta.get("file_id", "")
-            if fid not in seen_files:
-                seen_files.add(fid)
-                sources.append({
-                    "file_id":    fid,
-                    "file_name":  meta.get("file_name", "unknown"),
-                    "relevance":  round(1 - float(dist), 3),
-                })
+            chunk_idx = int(meta.get("chunk_idx", -1))
+            ref_key = (fid, chunk_idx)
+            if ref_key in seen_refs:
+                continue
+
+            seen_refs.add(ref_key)
+
+            page_val = int(meta.get("page", -1))
+            image_idx_val = int(meta.get("image_index", -1))
+
+            sources.append({
+                "file_id": fid,
+                "file_name": meta.get("file_name", "unknown"),
+                "relevance": round(1 - float(dist), 3),
+                "chunk_idx": chunk_idx if chunk_idx >= 0 else None,
+                "page": page_val if page_val >= 0 else None,
+                "image_index": image_idx_val if image_idx_val >= 0 else None,
+                "content_type": meta.get("content_type", "unknown"),
+                "snippet": chunk[:220].replace("\n", " "),
+            })
 
         return {"answer": answer, "sources": sources}
 
     # ─── Private helpers ───────────────────────────────────────────────────────
 
-    def _chunk_text(self, text: str) -> list[str]:
+    def _chunk_text(self, text: str, min_len: int = 50) -> list[str]:
         """Split text into overlapping chunks with a minimum size threshold."""
         text = re.sub(r'\n{3,}', '\n\n', text)  # Normalise whitespace
         chunks = []
@@ -324,9 +597,12 @@ Knowledge Base Context:
             end = min(start + CHUNK_SIZE, len(text))
             chunk = text[start:end].strip()
             # Skip tiny trailing chunks — they waste embed API calls and pollute results
-            if chunk and len(chunk) > 50:
+            if chunk and len(chunk) >= min_len:
                 chunks.append(chunk)
             start += CHUNK_SIZE - CHUNK_OVERLAP
+        if not chunks and text.strip():
+            # Keep short documents/images queryable instead of dropping them.
+            chunks.append(text.strip())
         return chunks
 
     async def _embed_batch(self, texts: list[str], task_type: str = "retrieval_document") -> list[list[float]]:
