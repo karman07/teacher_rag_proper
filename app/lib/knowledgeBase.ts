@@ -26,6 +26,7 @@ export interface KnowledgeFile {
   status: 'uploading' | 'processing' | 'ready' | 'error';
   chunkCount: number;
   cloudFileId?: string;
+  subjectId?: string | null;
   createdAt: string;
 }
 

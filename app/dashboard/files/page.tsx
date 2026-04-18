@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -114,16 +114,16 @@ function EditModal({ file, subjects, onSave, onClose }: {
             Assigned Subject
           </label>
           <Select
+            items={[{ id: 'all', name: 'Global (None)' }, ...subjects]}
             selectedKeys={[subjectId]}
             onSelectionChange={(k) => setSubjectId(k.currentKey as string)}
             size="sm"
             variant="bordered"
             classNames={{ trigger: 'border-divider' }}
           >
-            <SelectItem key="all" textValue="Global (None)">Global (None)</SelectItem>
-            {subjects.map(s => (
-              <SelectItem key={s.id} textValue={s.name}>{s.name}</SelectItem>
-            ))}
+            {(item) => (
+              <SelectItem key={item.id} textValue={item.name}>{item.name}</SelectItem>
+            )}
           </Select>
         </div>
 
@@ -276,8 +276,8 @@ function FileRow({ file, isSelected, onToggle, onEdit, onDelete, onChat, deletin
   );
 }
 
-/* --- Main page ------------------------------------------------------------ */
-export default function FilesPage() {
+/* --- Main page content --- */
+function FilesPageContent() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -670,5 +670,21 @@ export default function FilesPage() {
         </Modal>
       )}
     </DashboardLayout>
+  );
+}
+
+export default function FilesPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="max-w-5xl mx-auto space-y-5 animate-pulse">
+          <div className="h-20 bg-default-100 rounded-2xl" />
+          <div className="h-10 bg-default-100 rounded-xl" />
+          <div className="h-96 bg-default-100 rounded-3xl" />
+        </div>
+      </DashboardLayout>
+    }>
+      <FilesPageContent />
+    </Suspense>
   );
 }

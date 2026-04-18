@@ -213,8 +213,8 @@ export default function AnalyticsPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.08)" />
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeights: 900, fill: '#94a3b8' }} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeights: 900, fill: '#94a3b8' }} dx={-10} />
+                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 900, fill: '#94a3b8' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 900, fill: '#94a3b8' }} dx={-10} />
                     <ReTooltip content={<CustomTooltip />} />
                     <Area type="monotone" dataKey="teacherQ" name="Teacher" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorTeacher)" />
                     <Area type="monotone" dataKey="studentQ" name="Student" stroke="#8b5cf6" strokeWidth={4} fillOpacity={1} fill="url(#colorStudent)" />

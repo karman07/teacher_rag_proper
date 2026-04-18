@@ -44,6 +44,11 @@ export interface TopicStat {
   count: number;
 }
 
+export interface TopQuestion {
+  question: string;
+  count: number;
+}
+
 export interface RecentQuery {
   id:          string;
   question:    string;
