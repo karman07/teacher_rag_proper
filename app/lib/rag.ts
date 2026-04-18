@@ -1,6 +1,6 @@
 // lib/rag.ts — Client for Student RAG Service
 
-const RAG_API = process.env.NEXT_PUBLIC_RAG_API_URL ?? 'http://localhost:8000';
+export const RAG_API = process.env.NEXT_PUBLIC_RAG_API_URL ?? 'http://localhost:8000';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';

@@ -501,7 +501,7 @@ export default function ClassroomPage() {
               >
                 {selectedFile ? (
                   <PDFViewer 
-                    url={`http://localhost:3000/api/students/files/${selectedFile.id}`} 
+                    url={studentApi.fileUrl(selectedFile.id)} 
                     fileName={selectedFile.displayName || selectedFile.originalName || selectedFile.name || 'Document'} 
                     mimeType={selectedFile.mimeType}
                     classId={classId}

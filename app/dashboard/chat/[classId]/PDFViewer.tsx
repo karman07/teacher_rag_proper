@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, ZoomIn, ZoomOut, X, Download, Image as ImageIcon, FileDigit, Scissors, Sparkles, Bot, Edit3, Trash2 } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { API_URL } from '@/app/lib/api';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -83,7 +84,7 @@ export default function PDFViewer({
   const fetchNotes = useCallback(async () => {
     if (!classId) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/students/classes/${classId}/notes`, {
+      const res = await fetch(`${API_URL}/students/classes/${classId}/notes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -455,7 +456,7 @@ export default function PDFViewer({
     if (!noteText.trim() || !classId || !selState) return;
     setSavingNote(true);
     try {
-      await fetch(`http://localhost:3000/api/students/classes/${classId}/notes`, {
+      await fetch(`${API_URL}/students/classes/${classId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -480,7 +481,7 @@ export default function PDFViewer({
 
   const handleDeleteNote = async (id: string) => {
     try {
-      await fetch(`http://localhost:3000/api/students/notes/${id}`, {
+      await fetch(`${API_URL}/students/notes/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
