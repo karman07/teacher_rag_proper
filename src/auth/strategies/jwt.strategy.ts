@@ -33,11 +33,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload) {
     if (payload.role === 'student') {
       const student = await this.prisma.student.findUnique({
-        where: { id: payload.sub }
+        where: { id: payload.sub },
       });
+
       if (!student) {
-        throw new UnauthorizedException('Invalid or inactive student');
+        throw new UnauthorizedException('Invalid student token');
       }
+
       return {
         id: student.id,
         email: student.email,

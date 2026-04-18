@@ -132,7 +132,13 @@ export class StudentsService {
       throw new UnauthorizedException('You are not enrolled in this class');
     }
 
-    return enrollment.subject;
+    return {
+      ...enrollment.subject,
+      files: enrollment.subject.files.map((file) => ({
+        ...file,
+        sizeBytes: Number(file.sizeBytes),
+      })),
+    };
   }
 
   async getFileStream(studentId: string, fileId: string) {
