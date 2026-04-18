@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Request, Param, Response, StreamableFile, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, Param, Response, StreamableFile, NotFoundException, Patch, Delete } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -65,5 +65,33 @@ export class StudentsController {
       'Content-Disposition': `inline; filename="${file.originalName}"`,
     });
     return new StreamableFile(stream);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('classes/:id/notes')
+  @ApiOperation({ summary: 'Get all notes for a specific class' })
+  getNotes(@Request() req: any, @Param('id') id: string) {
+    return this.studentsService.getNotes(req.user.id, id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('classes/:id/notes')
+  @ApiOperation({ summary: 'Create a new note for a class' })
+  createNote(@Request() req: any, @Param('id') id: string, @Body() dto: any) {
+    return this.studentsService.createNote(req.user.id, id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('notes/:noteId')
+  @ApiOperation({ summary: 'Update an existing note' })
+  updateNote(@Request() req: any, @Param('noteId') noteId: string, @Body() dto: any) {
+    return this.studentsService.updateNote(req.user.id, noteId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('notes/:noteId')
+  @ApiOperation({ summary: 'Delete a note' })
+  deleteNote(@Request() req: any, @Param('noteId') noteId: string) {
+    return this.studentsService.deleteNote(req.user.id, noteId);
   }
 }

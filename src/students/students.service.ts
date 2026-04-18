@@ -115,6 +115,7 @@ export class StudentsService {
               select: {
                 id: true,
                 name: true,
+                originalName: true,
                 displayName: true,
                 mimeType: true,
                 sizeBytes: true,
@@ -158,6 +159,54 @@ export class StudentsService {
       mimeType: file.mimeType,
       originalName: file.originalName,
     };
+  }
+
+  // ─── Notes Operations ───────────────────────────────────────────────────────
+
+  async getNotes(studentId: string, subjectId: string) {
+    return this.prisma.note.findMany({
+      where: { studentId, subjectId },
+      orderBy: { createdAt: 'desc' },
+      include: { file: { select: { name: true, displayName: true } } }
+    });
+  }
+
+  async createNote(studentId: string, subjectId: string, dto: any) {
+    return this.prisma.note.create({
+      data: {
+        studentId,
+        subjectId,
+        content: dto.content,
+        fileId: dto.fileId || null,
+        pageNumber: dto.pageNumber || null,
+        selectionText: dto.selectionText || null,
+        selectionCoords: dto.selectionCoords || null,
+      }
+    });
+  }
+
+  async updateNote(studentId: string, noteId: string, dto: any) {
+    // Verify ownership
+    const note = await this.prisma.note.findUnique({ where: { id: noteId } });
+    if (!note || note.studentId !== studentId) {
+      throw new UnauthorizedException('Note not found or access denied');
+    }
+
+    return this.prisma.note.update({
+      where: { id: noteId },
+      data: { content: dto.content }
+    });
+  }
+
+  async deleteNote(studentId: string, noteId: string) {
+    const note = await this.prisma.note.findUnique({ where: { id: noteId } });
+    if (!note || note.studentId !== studentId) {
+      throw new UnauthorizedException('Note not found or access denied');
+    }
+
+    return this.prisma.note.delete({
+      where: { id: noteId }
+    });
   }
 
   private generateToken(student: any) {

@@ -63,6 +63,7 @@ model Student {
   enrollments  Enrollment[]
   queryLogs    QueryLog[]
   activityLogs ActivityLog[]
+  notes        Note[]
 }
 
 model Enrollment {
@@ -119,6 +120,7 @@ model Subject {
   queryLogs      QueryLog[]
   enrollments    Enrollment[]
   activityLogs   ActivityLog[]
+  notes          Note[]
 
   @@unique([teacherId, name])
   @@map("subjects")
@@ -146,6 +148,7 @@ model KnowledgeFile {
   updatedAt    DateTime   @updatedAt
 
   queryLogs    QueryLog[]
+  notes        Note[]
 
   @@map("knowledge_files")
 }
@@ -170,6 +173,24 @@ model QueryLog {
   createdAt    DateTime  @default(now())
 
   @@map("query_logs")
+}
+
+model Note {
+  id              String   @id @default(uuid())
+  content         String   @db.Text
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId       String
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  fileId          String?
+  file            KnowledgeFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  pageNumber      Int?
+  selectionText   String?  @db.Text
+  selectionCoords Json?    // {x, y, w, h} relative to viewport/page
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("notes")
 }
 
 // ─── JEWELLERY POS ────────────────────────────────────────────────────────────
