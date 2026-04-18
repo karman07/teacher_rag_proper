@@ -91,8 +91,8 @@ export class KnowledgeBaseService {
 
   async listFiles(teacherId: string, source?: FileSource, subjectId?: string) {
     const files = await this.prisma.knowledgeFile.findMany({
-      where: { 
-        teacherId, 
+      where: {
+        teacherId,
         ...(source ? { source } : {}),
         ...(subjectId ? { subjectId } : {}),
       },
@@ -314,10 +314,10 @@ export class KnowledgeBaseService {
         Key: dto.key,
       });
       const response = await s3Client.send(command);
-      
+
       const stream = response.Body as any;
       const writeStream = fs.createWriteStream(destPath);
-      
+
       await new Promise((resolve, reject) => {
         stream.pipe(writeStream);
         stream.on('end', resolve);
@@ -386,7 +386,7 @@ export class KnowledgeBaseService {
     if (kb) {
       axios.delete(`${RAG_SERVICE_URL}/files/${fileId}`, {
         data: { collection_name: kb.collectionName, file_id: fileId },
-      }).catch(() => {}); // Non-blocking
+      }).catch(() => { }); // Non-blocking
     }
 
     return { message: 'File deleted successfully' };
@@ -466,18 +466,18 @@ export class KnowledgeBaseService {
       });
 
       const response = await axios.post(`${RAG_SERVICE_URL}/ingest`, {
-        teacher_id:      teacherId,
+        teacher_id: teacherId,
         collection_name: collectionName,
-        file_id:         fileId,
-        file_path:       storagePath,
-        file_name:       originalName,
+        file_id: fileId,
+        file_path: storagePath,
+        file_name: originalName,
       }, { timeout: 120_000 }); // 2 min for large files
 
       // Mark ready with chunk count
       await this.prisma.knowledgeFile.update({
         where: { id: fileId },
         data: {
-          status:     FileStatus.ready,
+          status: FileStatus.ready,
           chunkCount: response.data?.chunks_added ?? 0,
         },
       });
@@ -490,7 +490,7 @@ export class KnowledgeBaseService {
       await this.prisma.knowledgeFile.update({
         where: { id: fileId },
         data: { status: FileStatus.error },
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }
 
