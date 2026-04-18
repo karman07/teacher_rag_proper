@@ -21,9 +21,22 @@ interface AugmentedMessage extends ChatMessage {
 
 import dynamic from 'next/dynamic';
 
-const renderInline = (text: string, role: 'user' | 'assistant') => {
+type SourceFocusRequest = {
+  requestId: string;
+  fileId: string;
+  page?: number | null;
+  chunkIdx?: number | null;
+  snippet?: string | null;
+};
+
+const renderInline = (
+  text: string,
+  role: 'user' | 'assistant',
+  sources: RAGSource[] = [],
+  onSourceClick?: (source: RAGSource) => void,
+) => {
   // Split on **bold** and `code` patterns
-  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`)/g);
+  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?)/gi);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 bg-blue-100/30 px-1 rounded-md'}`}>{part.slice(2, -2)}</strong>;
@@ -31,11 +44,53 @@ const renderInline = (text: string, role: 'user' | 'assistant') => {
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
       return <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-blue-700 font-mono text-xs font-bold">{part.slice(1, -1)}</code>;
     }
+
+    if (/Source\s+\d+/i.test(part) && sources.length && onSourceClick) {
+      const bits = part.split(/(Source\s+\d+)/gi);
+      return (
+        <span key={i}>
+          {bits.map((bit, bi) => {
+            const m = bit.match(/^Source\s+(\d+)$/i);
+            if (!m) return <span key={`${i}-${bi}`}>{bit}</span>;
+
+            const sourceIdx = Number(m[1]) - 1;
+            const src = sources[sourceIdx];
+            if (!src) return <span key={`${i}-${bi}`}>{bit}</span>;
+
+            return (
+              <button
+                key={`${i}-${bi}`}
+                onClick={() => onSourceClick(src)}
+                className={`underline decoration-2 underline-offset-2 font-black transition-colors ${
+                  role === 'user'
+                    ? 'text-white/90 hover:text-white'
+                    : 'text-blue-600 hover:text-blue-800'
+                }`}
+                title={src.page ? `Open cited context (page ${src.page})` : 'Open cited context'}
+              >
+                {bit}
+              </button>
+            );
+          })}
+        </span>
+      );
+    }
+
     return <span key={i}>{part}</span>;
   });
 };
 
-const MarkdownContent = ({ content, role }: { content: string, role: 'user' | 'assistant' }) => {
+const MarkdownContent = ({
+  content,
+  role,
+  sources,
+  onSourceClick,
+}: {
+  content: string,
+  role: 'user' | 'assistant',
+  sources?: RAGSource[],
+  onSourceClick?: (source: RAGSource) => void,
+}) => {
   if (typeof content !== 'string') return null;
   const lines = content.split('\n');
   const result: React.ReactNode[] = [];
@@ -67,6 +122,30 @@ const MarkdownContent = ({ content, role }: { content: string, role: 'user' | 'a
     // Empty line
     if (!trimmed) { result.push(<div key={i} className="h-2" />); i++; continue; }
 
+    // Source footer line from model output (e.g. "Source: ...")
+    if (/^source\s*:/i.test(trimmed) && role === 'assistant' && sources && sources.length && onSourceClick) {
+      result.push(
+        <p key={i} className="leading-relaxed text-sm">
+          <span className="font-black text-slate-700">Source: </span>
+          {sources.slice(0, 6).map((src, idx) => (
+            <span key={`${src.file_id}-${idx}`}>
+              <button
+                onClick={() => onSourceClick(src)}
+                className="underline decoration-2 underline-offset-2 font-black text-amber-700 hover:text-amber-900 transition-colors"
+                title={src.page ? `Open cited context (page ${src.page})` : 'Open cited context'}
+              >
+                {src.file_name?.split('/').pop()?.substring(0, 28) || `Source ${idx + 1}`}
+                {src.page ? ` (P${src.page})` : ''}
+              </button>
+              {idx < Math.min(6, sources.length) - 1 ? <span>{', '}</span> : null}
+            </span>
+          ))}
+        </p>
+      );
+      i++;
+      continue;
+    }
+
     // Horizontal rule
     if (/^-{3,}$/.test(trimmed)) { result.push(<hr key={i} className="border-slate-200 my-3" />); i++; continue; }
 
@@ -79,7 +158,7 @@ const MarkdownContent = ({ content, role }: { content: string, role: 'user' | 'a
         <div key={i} className={`mt-4 mb-1 font-black tracking-tight ${
           role === 'user' ? 'text-white' : `text-slate-900 border-l-4 border-blue-600 pl-3 bg-blue-50/50 py-1 rounded-r-lg ${sizes[level - 1]}`
         }`}>
-          {renderInline(headerMatch[2], role)}
+          {renderInline(headerMatch[2], role, sources, onSourceClick)}
         </div>
       );
       i++;
@@ -96,7 +175,7 @@ const MarkdownContent = ({ content, role }: { content: string, role: 'user' | 'a
           <span className={`absolute left-0 font-black text-sm ${role === 'user' ? 'text-white/60' : 'text-blue-600'}`}>
             {isNum ? bullet : '•'}
           </span>
-          <span className="text-sm">{renderInline(listMatch[2], role)}</span>
+          <span className="text-sm">{renderInline(listMatch[2], role, sources, onSourceClick)}</span>
         </div>
       );
       i++;
@@ -105,7 +184,7 @@ const MarkdownContent = ({ content, role }: { content: string, role: 'user' | 'a
 
     // Regular paragraph
     result.push(
-      <p key={i} className="leading-relaxed text-sm">{renderInline(trimmed, role)}</p>
+      <p key={i} className="leading-relaxed text-sm">{renderInline(trimmed, role, sources, onSourceClick)}</p>
     );
     i++;
   }
@@ -143,6 +222,7 @@ export default function ClassroomPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [showDoc, setShowDoc]         = useState(true);
+  const [sourceFocusRequest, setSourceFocusRequest] = useState<SourceFocusRequest | null>(null);
 
   const [libOpen, setLibOpen]       = useState(true);
 
@@ -209,6 +289,21 @@ export default function ClassroomPage() {
       setSending(false);
     }
   };
+
+  const handleSourceClick = useCallback((source: RAGSource) => {
+    const f = files.find((item: any) => item.id === source.file_id);
+    if (!f) return;
+
+    setSelectedFile(f);
+    setShowDoc(true);
+    setSourceFocusRequest({
+      requestId: crypto.randomUUID(),
+      fileId: source.file_id,
+      page: source.page,
+      chunkIdx: source.chunk_idx,
+      snippet: source.snippet,
+    });
+  }, [files]);
 
   const filteredFiles = files.filter((f: any) =>
     (f.displayName || f.name || f.originalName || '').toLowerCase().includes(searchQ.toLowerCase())
@@ -411,6 +506,7 @@ export default function ClassroomPage() {
                     mimeType={selectedFile.mimeType}
                     classId={classId}
                     selectedFileId={selectedFile.id}
+                    sourceFocusRequest={sourceFocusRequest}
                     onClose={() => setShowDoc(false)}
                     onPageChange={setCurrentPage}
                     onSelection={(text, image) => {
@@ -516,21 +612,13 @@ export default function ClassroomPage() {
                                 ? 'bg-red-50 border-red-200 text-red-600 rounded-tl-sm' 
                                 : 'bg-white border-slate-100 text-slate-700 rounded-tl-sm'
                           }`}>
-                            <MarkdownContent content={msg.content} role={msg.role} />
+                            <MarkdownContent
+                              content={msg.content}
+                              role={msg.role}
+                              sources={msg.sources}
+                              onSourceClick={handleSourceClick}
+                            />
                           </div>
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-1 px-1">
-                              {msg.sources.slice(0, 3).map((s, si) => (
-                                <button 
-                                  key={si} 
-                                  onClick={() => { const f = files.find((f: any) => f.id === s.file_id); if (f) setSelectedFile(f); }} 
-                                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white border border-slate-100 text-slate-500 hover:border-blue-600 hover:text-blue-600 transition-all shadow-xs"
-                                >
-                                  <FileText size={12} /> {s.file_name?.split('/').pop()?.substring(0, 15)}
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       </motion.div>
                     ))

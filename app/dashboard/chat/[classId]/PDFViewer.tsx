@@ -18,6 +18,13 @@ interface PDFViewerProps {
   onPageChange?: (page: number) => void;
   classId?: string;
   selectedFileId?: string;
+  sourceFocusRequest?: {
+    requestId: string;
+    fileId: string;
+    page?: number | null;
+    chunkIdx?: number | null;
+    snippet?: string | null;
+  } | null;
 }
 
 interface SavedNote {
@@ -36,7 +43,7 @@ interface SelectionState {
 
 export default function PDFViewer({
   url, fileName, mimeType = 'application/pdf',
-  onClose, onSelection, onPageChange, classId, selectedFileId
+  onClose, onSelection, onPageChange, classId, selectedFileId, sourceFocusRequest
 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.2);
@@ -55,10 +62,17 @@ export default function PDFViewer({
   const [allNotes, setAllNotes] = useState<SavedNote[]>([]);
   const [hoveredNote, setHoveredNote] = useState<SavedNote | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [activeSourceFocus, setActiveSourceFocus] = useState<{
+    requestId: string;
+    fileId: string;
+    page?: number | null;
+    snippet?: string | null;
+  } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const drawingRef = useRef<{ x: number; y: number } | null>(null);
   const pageRefs = useRef<{ [k: number]: HTMLDivElement | null }>({});
+  const lastAppliedSourceFocusRef = useRef<string | null>(null);
 
   const isPDF = mimeType.includes('pdf');
   const isImage = mimeType.includes('image');
@@ -165,6 +179,18 @@ export default function PDFViewer({
         .student-note-highlight:hover {
           background: rgba(251, 191, 36, 0.7);
         }
+        .ai-source-highlight {
+          background: rgba(251, 191, 36, 0.45);
+          border-bottom: 2px solid #f59e0b;
+          border-radius: 2px;
+          padding: 0 1px;
+          box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25);
+          animation: ai-source-pulse 1.6s ease-out 1;
+        }
+        @keyframes ai-source-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
+          100% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+        }
         .react-pdf__Page__textContent span {
           cursor: text;
         }
@@ -187,6 +213,201 @@ export default function PDFViewer({
     document.addEventListener('click', handleMarkClick);
     return () => document.removeEventListener('click', handleMarkClick);
   }, [allNotes]);
+
+  const clearSourceHighlights = useCallback(() => {
+    document.querySelectorAll('.ai-source-highlight').forEach(el => {
+      const parent = el.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(el.textContent || ''), el);
+        (parent as any).normalize?.();
+      }
+    });
+  }, []);
+
+  const highlightSourceSnippet = useCallback((snippet?: string | null) => {
+    clearSourceHighlights();
+    const pageContainer = pageRefs.current[currentPage];
+    if (!pageContainer || !snippet) return;
+
+    const textLayer = pageContainer.querySelector('.react-pdf__Page__textContent');
+    if (!textLayer) return;
+
+    const textNodes: Text[] = [];
+    const walker = document.createTreeWalker(textLayer, NodeFilter.SHOW_TEXT);
+    let node: Text | null;
+    while ((node = walker.nextNode() as Text | null)) {
+      if ((node.textContent || '').trim()) {
+        textNodes.push(node);
+      }
+    }
+    if (!textNodes.length) return;
+
+    const fullText = textNodes.map(n => n.textContent || '').join('');
+    const normalizedSnippet = snippet.replace(/\s+/g, ' ').trim();
+
+    const candidates = [
+      normalizedSnippet,
+      normalizedSnippet.slice(0, 180),
+      normalizedSnippet.slice(0, 120),
+      normalizedSnippet.slice(0, 80),
+    ].filter(s => s.length >= 24);
+
+    let matchIdx = -1;
+    let matchText = '';
+    for (const candidate of candidates) {
+      const idx = fullText.indexOf(candidate);
+      if (idx >= 0) {
+        matchIdx = idx;
+        matchText = candidate;
+        break;
+      }
+    }
+
+    if (matchIdx >= 0) {
+      let cursor = 0;
+      for (const tn of textNodes) {
+        const len = tn.textContent?.length || 0;
+        if (matchIdx >= cursor && matchIdx < cursor + len) {
+          const startOffset = matchIdx - cursor;
+          const endOffset = Math.min(startOffset + matchText.length, len);
+          const range = document.createRange();
+          range.setStart(tn, startOffset);
+          range.setEnd(tn, endOffset);
+          const mark = document.createElement('mark');
+          mark.className = 'ai-source-highlight';
+          range.surroundContents(mark);
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        cursor += len;
+      }
+    }
+
+    const tokens = Array.from(
+      new Set((normalizedSnippet.toLowerCase().match(/[a-z0-9]{4,}/g) || []).slice(0, 24))
+    );
+    if (!tokens.length) return;
+
+    const words = normalizedSnippet.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3);
+    const phraseCandidates: string[] = [];
+    for (let size = Math.min(10, words.length); size >= 5; size--) {
+      for (let i = 0; i + size <= words.length; i++) {
+        phraseCandidates.push(words.slice(i, i + size).join(' '));
+      }
+      if (phraseCandidates.length >= 20) break;
+    }
+
+    for (const tn of textNodes) {
+      const text = (tn.textContent || '').toLowerCase();
+      let bestPhrase = '';
+      let bestIdx = -1;
+
+      for (const phrase of phraseCandidates) {
+        const idx = text.indexOf(phrase);
+        if (idx >= 0 && phrase.length > bestPhrase.length) {
+          bestPhrase = phrase;
+          bestIdx = idx;
+        }
+      }
+
+      if (bestIdx >= 0 && bestPhrase.length >= 24) {
+        const range = document.createRange();
+        range.setStart(tn, bestIdx);
+        range.setEnd(tn, Math.min(bestIdx + bestPhrase.length, tn.textContent?.length || 0));
+        const mark = document.createElement('mark');
+        mark.className = 'ai-source-highlight';
+        range.surroundContents(mark);
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    let bestNode: Text | null = null;
+    let bestScore = 0;
+    let bestPositions: Array<{ start: number; end: number }> = [];
+
+    for (const tn of textNodes) {
+      const text = (tn.textContent || '').toLowerCase();
+      const positions: Array<{ start: number; end: number }> = [];
+
+      for (const token of tokens) {
+        const idx = text.indexOf(token);
+        if (idx >= 0) {
+          positions.push({ start: idx, end: idx + token.length });
+        }
+      }
+
+      if (positions.length > bestScore) {
+        bestScore = positions.length;
+        bestNode = tn;
+        bestPositions = positions;
+      }
+    }
+
+    if (!bestNode || bestScore < 3) return;
+
+    const nodeLen = bestNode.textContent?.length || 0;
+    const start = Math.max(0, Math.min(...bestPositions.map(p => p.start)) - 6);
+    const coreEnd = Math.min(nodeLen, Math.max(...bestPositions.map(p => p.end)) + 6);
+    const end = Math.min(nodeLen, Math.max(coreEnd, start + 40));
+
+    if (end <= start) return;
+
+    const range = document.createRange();
+    range.setStart(bestNode, start);
+    range.setEnd(bestNode, end);
+    const mark = document.createElement('mark');
+    mark.className = 'ai-source-highlight';
+    range.surroundContents(mark);
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [clearSourceHighlights, currentPage]);
+
+  useEffect(() => {
+    if (!sourceFocusRequest || !isPDF) return;
+    if (!selectedFileId || sourceFocusRequest.fileId !== selectedFileId) return;
+
+    // New citation request: allow one fresh highlight application.
+    lastAppliedSourceFocusRef.current = null;
+
+    setActiveSourceFocus({
+      requestId: sourceFocusRequest.requestId,
+      fileId: sourceFocusRequest.fileId,
+      page: sourceFocusRequest.page,
+      snippet: sourceFocusRequest.snippet,
+    });
+
+    const targetPage = sourceFocusRequest.page && sourceFocusRequest.page > 0
+      ? sourceFocusRequest.page
+      : 1;
+
+    setCurrentPage(targetPage);
+    onPageChange?.(targetPage);
+
+    setTimeout(() => {
+      const pageEl = pageRefs.current[targetPage];
+      if (pageEl && containerRef.current) {
+        containerRef.current.scrollTo({
+          top: Math.max(0, pageEl.offsetTop - 24),
+          behavior: 'smooth',
+        });
+      }
+    }, 120);
+  }, [sourceFocusRequest, isPDF, selectedFileId, onPageChange]);
+
+  useEffect(() => {
+    if (!activeSourceFocus || !isPDF) return;
+    if (activeSourceFocus.page && activeSourceFocus.page !== currentPage) return;
+
+    const applyKey = `${activeSourceFocus.requestId}:${currentPage}`;
+    if (lastAppliedSourceFocusRef.current === applyKey) return;
+
+    const timeout = setTimeout(() => {
+      highlightSourceSnippet(activeSourceFocus.snippet);
+      lastAppliedSourceFocusRef.current = applyKey;
+    }, 420);
+
+    return () => clearTimeout(timeout);
+  }, [activeSourceFocus, currentPage, isPDF, highlightSourceSnippet]);
 
   // ── Page intersection observer ─────────────────────────────────────────────
   useEffect(() => {
