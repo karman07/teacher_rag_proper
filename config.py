@@ -6,7 +6,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    gemini_api_key: str
+    gemini_api_key: str | None = None
     chroma_persist_dir: str = "./chroma_db"
     uploads_root: str = "../backend/uploads"
     rag_host: str = "0.0.0.0"

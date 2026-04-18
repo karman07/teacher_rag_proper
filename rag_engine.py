@@ -51,11 +51,21 @@ class RAGEngine:
     def __init__(self):
         cfg = get_settings()
 
-        # Configure Gemini
-        genai.configure(api_key=cfg.gemini_api_key)
+        self._gemini_api_key = (cfg.gemini_api_key or "").strip()
+        self._gemini_enabled = bool(self._gemini_api_key)
         self._embed_model = "models/gemini-embedding-001"
-        self._gen_model   = genai.GenerativeModel("gemini-2.5-flash")
-        self._vision_model = genai.GenerativeModel(cfg.vision_model_name)
+        self._gen_model = None
+        self._vision_model = None
+
+        if self._gemini_enabled:
+            # Configure Gemini only when a real key is available.
+            genai.configure(api_key=self._gemini_api_key)
+            self._gen_model = genai.GenerativeModel("gemini-2.5-flash")
+            self._vision_model = genai.GenerativeModel(cfg.vision_model_name)
+        else:
+            logger.warning(
+                "GEMINI_API_KEY is not set; the app will start, but ingest/query features are disabled until it is configured."
+            )
 
         # ChromaDB persistent client
         os.makedirs(cfg.chroma_persist_dir, exist_ok=True)
@@ -73,12 +83,22 @@ class RAGEngine:
         self._pdf_vision_concurrency = cfg.pdf_vision_concurrency
         self._blip_processor = None
         self._blip_model = None
-        logger.info("RAGEngine initialised — Gemini + ChromaDB ready")
+        if self._gemini_enabled:
+            logger.info("RAGEngine initialised — Gemini + ChromaDB ready")
+        else:
+            logger.info("RAGEngine initialised — ChromaDB ready, Gemini disabled")
         logger.info(f"Image caption backend: {self._image_caption_backend}")
+
+    def _require_gemini(self, purpose: str) -> None:
+        if not self._gemini_enabled or self._gen_model is None or self._vision_model is None:
+            raise RuntimeError(
+                f"{purpose} requires GEMINI_API_KEY to be set in ai-backend/.env or the environment."
+            )
 
     # ─── Public: Ingest ────────────────────────────────────────────────────────
     async def _describe_with_gemini(self, file_path: str, mime_type: str) -> str:
         """Use Gemini Vision to describe an image, graph, or chart."""
+        self._require_gemini("Vision captioning")
         logger.info(f"[vision] describing {mime_type} at {file_path}")
         try:
             with open(file_path, "rb") as f:
@@ -153,6 +173,7 @@ class RAGEngine:
 
             logger.warning("[blip] caption empty, falling back to Gemini Vision")
 
+        self._require_gemini("Vision fallback")
         return await self._describe_with_gemini(file_path, mime_type)
 
     async def _extract_pdf_image_unit(
@@ -473,7 +494,17 @@ class RAGEngine:
 
         Returns {'answer': str, 'sources': list[dict]}
         """
-        logger.info(f"[query] teacher={teacher_id} q='{question[:60]}...'")
+        self._require_gemini("Question answering")
+        scope_pattern = r"^\[Context:\s*Only answer from the file with id\s+([a-f0-9-]+)\]\s*"
+        scope_match = re.match(scope_pattern, question, flags=re.IGNORECASE)
+        scoped_file_id = scope_match.group(1) if scope_match else None
+        effective_question = re.sub(scope_pattern, "", question, count=1, flags=re.IGNORECASE).strip()
+        if not effective_question:
+            effective_question = question
+
+        logger.info(
+            f"[query] teacher={teacher_id} scoped_file_id={scoped_file_id} q='{effective_question[:60]}...'"
+        )
 
         # 1. Get collection
         try:
@@ -485,20 +516,32 @@ class RAGEngine:
             }
 
         # 2. Embed the question (offloaded to thread pool — non-blocking)
-        q_embedding = (await self._embed_batch([question], task_type="retrieval_query"))[0]
+        q_embedding = (await self._embed_batch([effective_question], task_type="retrieval_query"))[0]
 
         # 3. Retrieve top-k chunks
-        results = col.query(
-            query_embeddings=[q_embedding],
-            n_results=min(top_k, col.count()),
-            include=["documents", "metadatas", "distances"],
-        )
+        query_kwargs = {
+            "query_embeddings": [q_embedding],
+            "n_results": min(top_k, col.count()),
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if scoped_file_id:
+            query_kwargs["where"] = {"file_id": scoped_file_id}
+
+        results = col.query(**query_kwargs)
 
         chunks    = results["documents"][0]
         metadatas = results["metadatas"][0]
         distances = results["distances"][0]
 
         if not chunks:
+            if scoped_file_id:
+                return {
+                    "answer": (
+                        "I cannot answer your question as no context from the file "
+                        f"with ID {scoped_file_id} was provided in the knowledge base."
+                    ),
+                    "sources": [],
+                }
             return {
                 "answer": "I couldn't find relevant information in your knowledge base for this question.",
                 "sources": [],
@@ -552,13 +595,43 @@ Knowledge Base Context:
             except Exception as e:
                 logger.error(f"Image processing error: {e}")
 
-        prompt_parts.append(f"Student Question: {question}")
+        prompt_parts.append(f"Student Question: {effective_question}")
 
         # 6. Generate answer (offloaded to thread pool — non-blocking)
         response = await asyncio.to_thread(self._gen_model.generate_content, prompt_parts)
         answer = response.text.strip()
 
         # 7. Build source list with chunk-level references for frontend citations.
+        question_terms = set(re.findall(r"[a-z0-9]{4,}", effective_question.lower()))
+
+        def _build_relevant_snippet(chunk_text: str) -> str:
+            clean = re.sub(r"\s+", " ", chunk_text).strip()
+            if not clean:
+                return ""
+
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", clean) if s.strip()]
+            if not sentences:
+                return clean[:280]
+
+            best_idx = 0
+            best_score = -1
+            for idx, sentence in enumerate(sentences):
+                sent_terms = set(re.findall(r"[a-z0-9]{4,}", sentence.lower()))
+                overlap = len(sent_terms & question_terms)
+                score = overlap * 3 + min(len(sentence), 200) / 200
+                if score > best_score:
+                    best_score = score
+                    best_idx = idx
+
+            if best_score <= 0:
+                return clean[:280]
+
+            snippet = sentences[best_idx]
+            if len(snippet) < 140 and best_idx + 1 < len(sentences):
+                snippet = f"{snippet} {sentences[best_idx + 1]}"
+
+            return snippet[:280]
+
         seen_refs = set()
         sources = []
         for chunk, meta, dist in zip(chunks, metadatas, distances):
@@ -581,7 +654,7 @@ Knowledge Base Context:
                 "page": page_val if page_val >= 0 else None,
                 "image_index": image_idx_val if image_idx_val >= 0 else None,
                 "content_type": meta.get("content_type", "unknown"),
-                "snippet": chunk[:220].replace("\n", " "),
+                "snippet": _build_relevant_snippet(chunk),
             })
 
         return {"answer": answer, "sources": sources}
@@ -611,6 +684,7 @@ Knowledge Base Context:
         Runs the synchronous Gemini SDK call in a thread-pool executor so it
         never blocks the FastAPI event loop.
         """
+        self._require_gemini("Document embedding")
         result = await asyncio.to_thread(
             genai.embed_content,
             model=self._embed_model,
