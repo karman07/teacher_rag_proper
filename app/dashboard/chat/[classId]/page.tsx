@@ -186,7 +186,7 @@ export default function ClassroomPage() {
         q || '',
         String(classroom?.collectionName || ''),
         String(classroom?.teacherId || ''),
-        messages.map(({ role, content }) => ({ role: String(role), content: String(content) })),
+        messages.map(({ role, content }) => ({ role, content })),
         chatScope === 'file' ? selectedFile?.id : undefined,
         imageBase64
       );
@@ -560,7 +560,7 @@ export default function ClassroomPage() {
                       className="flex-1 bg-transparent text-sm font-black outline-none text-slate-800 placeholder-slate-400 h-10 tracking-tight"
                     />
                     <button 
-                      onClick={sendMessage} 
+                      onClick={() => sendMessage()} 
                       disabled={sending || !input.trim()} 
                       className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
                         (sending || !input.trim()) ? 'bg-slate-200 text-slate-400' : 'bg-blue-600 text-white shadow-lg hover:bg-blue-700 hover:scale-105 active:scale-95'
