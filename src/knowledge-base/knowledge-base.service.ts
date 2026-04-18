@@ -16,7 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'http://localhost:8000';
+const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'https://teacheraiai.parteekbhatia.com';
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
