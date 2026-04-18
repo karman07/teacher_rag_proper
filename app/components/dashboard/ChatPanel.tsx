@@ -6,11 +6,11 @@ import {
   Button, Input, Card, CardBody, Chip, ScrollShadow, Spinner, Avatar
 } from '@heroui/react';
 import {
-  Send, X, Bot, User, FileText, Sparkles, RotateCcw,
-  ChevronDown, ExternalLink, AlertCircle
+  Send, X, Bot, User, FileText, Sparkles, RotateCcw, AlertCircle
 } from 'lucide-react';
 import { queryRAG, ChatMessage, RAGSource } from '../../lib/ragApi';
 import { KnowledgeFile } from '../../lib/knowledgeBase';
+import SourceCitations from '../common/SourceCitations';
 
 interface Props {
   isOpen: boolean;
@@ -71,21 +71,7 @@ function MessageBubble({ msg, sources }: { msg: ChatMessage; sources?: RAGSource
           {msg.content}
         </div>
 
-        {/* Sources */}
-        {sources && sources.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {sources.map((src) => (
-              <span
-                key={src.file_id}
-                className="inline-flex items-center gap-1 text-[10px] text-default-500 bg-default-100 dark:bg-default-100/10 px-2 py-0.5 rounded-full border border-divider"
-              >
-                <FileText size={9} />
-                {src.file_name.length > 25 ? src.file_name.slice(0, 25) + '…' : src.file_name}
-                <span className="text-success-500 font-medium">{Math.round(src.relevance * 100)}%</span>
-              </span>
-            ))}
-          </div>
-        )}
+        <SourceCitations sources={sources ?? []} />
       </div>
     </motion.div>
   );

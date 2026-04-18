@@ -21,6 +21,11 @@ export interface RAGSource {
   file_id:   string;
   file_name: string;
   relevance: number;
+  chunk_idx?: number | null;
+  page?: number | null;
+  image_index?: number | null;
+  content_type?: string | null;
+  snippet?: string | null;
 }
 
 export interface RAGQueryResponse {

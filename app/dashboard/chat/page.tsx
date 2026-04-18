@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Input, Card, CardBody, Skeleton } from '@heroui/react';
 import {
-  Send, Bot, User, RotateCcw, FileText, Sparkles,
+  Send, Bot, User, RotateCcw, Sparkles,
   AlertCircle, ChevronDown, BookOpen as SubjectIcon
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +15,7 @@ import { analyticsApi } from '../../lib/analyticsApi';
 import { knowledgeBaseApi, KnowledgeBaseStats } from '../../lib/knowledgeBase';
 import { subjectsApi, Subject } from '../../lib/subjects';
 import { COLORS } from '../../constants/colors';
+import SourceCitations from '../../components/common/SourceCitations';
 
 const C = { blue: COLORS.primary[600], violet: COLORS.accent.violet };
 
@@ -63,17 +64,7 @@ function MessageBubble({ msg }: { msg: ChatMessage & { sources?: RAGSource[] } }
         }`}>
           {msg.content}
         </div>
-        {msg.sources && msg.sources.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {msg.sources.map((s) => (
-              <span key={s.file_id} className="inline-flex items-center gap-1 text-[10px] border border-divider px-2 py-0.5 rounded-full text-default-500">
-                <FileText size={9} />
-                {s.file_name.length > 22 ? s.file_name.slice(0, 22) + '…' : s.file_name}
-                <span className="font-bold" style={{ color: COLORS.accent.emerald }}>{Math.round(s.relevance * 100)}%</span>
-              </span>
-            ))}
-          </div>
-        )}
+        <SourceCitations sources={msg.sources ?? []} />
       </div>
     </motion.div>
   );
