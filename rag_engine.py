@@ -605,7 +605,10 @@ Knowledge Base Context:
         question_terms = set(re.findall(r"[a-z0-9]{4,}", effective_question.lower()))
 
         def _build_relevant_snippet(chunk_text: str) -> str:
-            clean = re.sub(r"\s+", " ", chunk_text).strip()
+            lines = [ln.strip() for ln in chunk_text.splitlines() if ln.strip()]
+            # Remove synthetic ingest headers that are useful for metadata but noisy for viewer highlighting.
+            lines = [ln for ln in lines if not re.match(r"^\[(Source|Classification):", ln, flags=re.IGNORECASE)]
+            clean = re.sub(r"\s+", " ", " ".join(lines)).strip()
             if not clean:
                 return ""
 
