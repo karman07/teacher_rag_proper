@@ -179,20 +179,22 @@ model QueryLog {
 }
 
 model Note {
-  id              String   @id @default(uuid())
-  content         String   @db.Text
+  id              String         @id @default(uuid())
   studentId       String
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student         Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
   subjectId       String
-  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject         Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   fileId          String?
   file            KnowledgeFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  content         String         @db.Text
   pageNumber      Int?
-  selectionText   String?  @db.Text
-  selectionCoords Json?    // {x, y, w, h} relative to viewport/page
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  selectionText   String?        @db.Text
+  selectionCoords Json?          // {x, y, w, h} relative to viewport/page
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
+  @@index([studentId, subjectId])
+  @@index([fileId])
   @@map("notes")
 }
 
