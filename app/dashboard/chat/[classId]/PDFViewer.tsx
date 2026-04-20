@@ -244,7 +244,18 @@ export default function PDFViewer({
     if (!textNodes.length) return;
 
     const fullText = textNodes.map(n => n.textContent || '').join('');
-    const normalizedSnippet = snippet.replace(/\s+/g, ' ').trim();
+    const normalizedSnippet = snippet
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      // Backend snippets may include synthetic metadata lines that never appear in PDF text layers.
+      .filter((line) => !/^\[(source|classification):/i.test(line))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (normalizedSnippet.length < 12) return;
+    const fullTextLower = fullText.toLowerCase();
 
     const candidates = [
       normalizedSnippet,
@@ -256,7 +267,7 @@ export default function PDFViewer({
     let matchIdx = -1;
     let matchText = '';
     for (const candidate of candidates) {
-      const idx = fullText.indexOf(candidate);
+      const idx = fullTextLower.indexOf(candidate.toLowerCase());
       if (idx >= 0) {
         matchIdx = idx;
         matchText = candidate;
