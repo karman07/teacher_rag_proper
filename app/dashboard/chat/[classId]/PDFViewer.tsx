@@ -31,8 +31,17 @@ interface PDFViewerProps {
 interface SavedNote {
   id: string;
   content: string;
-  selectionText: string;
-  pageNumber: number;
+  selectionText?: string;
+  pageNumber?: number;
+  fileId?: string;
+  selectionCoords?: {
+    version?: number;
+    pageNumber?: number;
+    quote?: string;
+    startOffset?: number;
+    endOffset?: number;
+    rects?: Array<{ x: number; y: number; w: number; h: number }>;
+  } | null;
   createdAt: string;
 }
 
@@ -40,6 +49,20 @@ interface SelectionState {
   text: string;
   menuX: number;
   menuY: number;
+  pageNumber: number;
+  selectionCoords: {
+    version: number;
+    pageNumber: number;
+    quote: string;
+    rects: Array<{ x: number; y: number; w: number; h: number }>;
+  };
+}
+
+interface NormalizedRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export default function PDFViewer({
@@ -63,6 +86,8 @@ export default function PDFViewer({
   const [allNotes, setAllNotes] = useState<SavedNote[]>([]);
   const [hoveredNote, setHoveredNote] = useState<SavedNote | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [sourceHighlightRects, setSourceHighlightRects] = useState<NormalizedRect[]>([]);
   const [activeSourceFocus, setActiveSourceFocus] = useState<{
     requestId: string;
     fileId: string;
@@ -101,67 +126,6 @@ export default function PDFViewer({
     fetchNotes();
   }, [fetchNotes]);
 
-  // ── Apply highlight marks to text layer after render ──────────────────────
-  useEffect(() => {
-    if (!isPDF) return;
-
-    // Small delay to let PDF.js finish rendering text spans
-    const timeout = setTimeout(() => {
-      // Remove all previous highlights
-      document.querySelectorAll('.student-note-highlight').forEach(el => {
-        const parent = el.parentNode;
-        if (parent) {
-          parent.replaceChild(document.createTextNode(el.textContent || ''), el);
-          (parent as any).normalize?.();
-        }
-      });
-
-      // Apply highlights for current page notes
-      const pageNotes = allNotes.filter(n => n.selectionText && n.pageNumber);
-      const pageContainer = pageRefs.current[currentPage];
-      if (!pageContainer) return;
-      const textLayer = pageContainer.querySelector('.react-pdf__Page__textContent');
-      if (!textLayer) return;
-
-      const walker = document.createTreeWalker(textLayer, NodeFilter.SHOW_TEXT);
-      const textNodes: Text[] = [];
-      let node: Text | null;
-      while ((node = walker.nextNode() as Text | null)) {
-        textNodes.push(node);
-      }
-      const fullText = textNodes.map(n => n.textContent || '').join('');
-
-      pageNotes.forEach(note => {
-        const searchText = note.selectionText;
-        if (!searchText) return;
-        const idx = fullText.indexOf(searchText);
-        if (idx === -1) return;
-
-        let charCount = 0;
-        for (const tn of textNodes) {
-          const len = tn.textContent?.length || 0;
-          const start = charCount;
-          const end = charCount + len;
-          if (idx >= start && idx < end) {
-            const range = document.createRange();
-            range.setStart(tn, idx - start);
-            range.setEnd(tn, Math.min(idx - start + searchText.length, len));
-            const mark = document.createElement('mark');
-            mark.className = 'student-note-highlight';
-            mark.dataset.noteId = note.id;
-            mark.dataset.noteContent = note.content;
-            mark.title = note.content;
-            range.surroundContents(mark);
-            break;
-          }
-          charCount += len;
-        }
-      });
-    }, 500);
-
-    return () => clearTimeout(timeout);
-  }, [allNotes, currentPage, isPDF, numPages]);
-
   // ── Inject highlight CSS once ─────────────────────────────────────────────
   useEffect(() => {
     const styleId = 'student-note-highlight-style';
@@ -169,24 +133,37 @@ export default function PDFViewer({
       const style = document.createElement('style');
       style.id = styleId;
       style.textContent = `
-        .student-note-highlight {
-          background: rgba(251, 191, 36, 0.45);
-          border-bottom: 2px solid #f59e0b;
-          border-radius: 2px;
+        .student-note-overlay {
+          background: rgba(59, 130, 246, 0.18);
+          border-bottom: 1px solid rgba(37, 99, 235, 0.9);
+          border-radius: 3px;
           cursor: pointer;
-          padding: 0 1px;
-          transition: background 0.15s;
+          transition: background 0.15s, box-shadow 0.2s;
+          pointer-events: auto;
+          border: 0;
         }
-        .student-note-highlight:hover {
-          background: rgba(251, 191, 36, 0.7);
+        .student-note-overlay:hover {
+          background: rgba(59, 130, 246, 0.3);
+          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.22);
+        }
+        .student-note-overlay.active {
+          background: rgba(37, 99, 235, 0.28);
+          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.32);
         }
         .ai-source-highlight {
-          background: rgba(251, 191, 36, 0.45);
-          border-bottom: 2px solid #f59e0b;
+          background: rgba(251, 191, 36, 0.22);
+          border-bottom: 1px solid rgba(245, 158, 11, 0.95);
           border-radius: 2px;
-          padding: 0 1px;
-          box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25);
+          padding: 0;
+          box-shadow: none;
           animation: ai-source-pulse 1.6s ease-out 1;
+        }
+        .ai-source-overlay {
+          background: rgba(251, 191, 36, 0.2);
+          border-bottom: 1px solid rgba(245, 158, 11, 0.92);
+          border-radius: 2px;
+          pointer-events: none;
+          animation: ai-source-pulse 1.2s ease-out 1;
         }
         @keyframes ai-source-pulse {
           0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
@@ -200,29 +177,83 @@ export default function PDFViewer({
     }
   }, []);
 
-  // ── Delegate click on highlight marks ────────────────────────────────────
-  useEffect(() => {
-    const handleMarkClick = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest('.student-note-highlight') as HTMLElement | null;
-      if (!target) return;
-      const note = allNotes.find(n => n.id === target.dataset.noteId);
-      if (note) {
-        setHoveredNote(note);
-        setTooltipPos({ x: e.clientX, y: e.clientY - 60 });
-      }
+  const getSelectionCoords = useCallback((range: Range, text: string) => {
+    const common = range.commonAncestorContainer;
+    const commonElement = (common.nodeType === Node.TEXT_NODE
+      ? common.parentElement
+      : common as Element) || null;
+    const pageContainer = commonElement?.closest('[data-page-number]') as HTMLElement | null;
+    if (!pageContainer) return null;
+
+    const pageNumber = Number(pageContainer.getAttribute('data-page-number') || currentPage);
+    const pageRect = pageContainer.getBoundingClientRect();
+    if (!pageRect.width || !pageRect.height) return null;
+
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, Number(value.toFixed(6))));
+
+    const rects = Array.from(range.getClientRects())
+      .map((rect) => {
+        const left = Math.max(rect.left, pageRect.left);
+        const top = Math.max(rect.top, pageRect.top);
+        const right = Math.min(rect.right, pageRect.right);
+        const bottom = Math.min(rect.bottom, pageRect.bottom);
+        const width = right - left;
+        const height = bottom - top;
+        if (width <= 1 || height <= 1) return null;
+        return {
+          x: clamp01((left - pageRect.left) / pageRect.width),
+          y: clamp01((top - pageRect.top) / pageRect.height),
+          w: clamp01(width / pageRect.width),
+          h: clamp01(height / pageRect.height),
+        };
+      })
+      .filter((rect): rect is { x: number; y: number; w: number; h: number } => !!rect);
+
+    if (!rects.length) return null;
+
+    return {
+      pageNumber,
+      selectionCoords: {
+        version: 1,
+        pageNumber,
+        quote: text,
+        rects,
+      },
     };
-    document.addEventListener('click', handleMarkClick);
-    return () => document.removeEventListener('click', handleMarkClick);
-  }, [allNotes]);
+  }, [currentPage]);
 
   const clearSourceHighlights = useCallback(() => {
-    document.querySelectorAll('.ai-source-highlight').forEach(el => {
-      const parent = el.parentNode;
-      if (parent) {
-        parent.replaceChild(document.createTextNode(el.textContent || ''), el);
-        (parent as any).normalize?.();
-      }
-    });
+    setSourceHighlightRects([]);
+  }, []);
+
+  const setSourceRectsFromRange = useCallback((range: Range, pageContainer: HTMLElement) => {
+    const pageRect = pageContainer.getBoundingClientRect();
+    if (!pageRect.width || !pageRect.height) {
+      setSourceHighlightRects([]);
+      return;
+    }
+
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, Number(value.toFixed(6))));
+
+    const rects = Array.from(range.getClientRects())
+      .map((rect) => {
+        const left = Math.max(rect.left, pageRect.left);
+        const top = Math.max(rect.top, pageRect.top);
+        const right = Math.min(rect.right, pageRect.right);
+        const bottom = Math.min(rect.bottom, pageRect.bottom);
+        const width = right - left;
+        const height = bottom - top;
+        if (width <= 1 || height <= 1) return null;
+        return {
+          x: clamp01((left - pageRect.left) / pageRect.width),
+          y: clamp01((top - pageRect.top) / pageRect.height),
+          w: clamp01(width / pageRect.width),
+          h: clamp01(height / pageRect.height),
+        };
+      })
+      .filter((rect): rect is NormalizedRect => !!rect);
+
+    setSourceHighlightRects(rects);
   }, []);
 
   const highlightSourceSnippet = useCallback((snippet?: string | null) => {
@@ -285,10 +316,7 @@ export default function PDFViewer({
           const range = document.createRange();
           range.setStart(tn, startOffset);
           range.setEnd(tn, endOffset);
-          const mark = document.createElement('mark');
-          mark.className = 'ai-source-highlight';
-          range.surroundContents(mark);
-          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setSourceRectsFromRange(range, pageContainer);
           return;
         }
         cursor += len;
@@ -326,10 +354,7 @@ export default function PDFViewer({
         const range = document.createRange();
         range.setStart(tn, bestIdx);
         range.setEnd(tn, Math.min(bestIdx + bestPhrase.length, tn.textContent?.length || 0));
-        const mark = document.createElement('mark');
-        mark.className = 'ai-source-highlight';
-        range.surroundContents(mark);
-        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setSourceRectsFromRange(range, pageContainer);
         return;
       }
     }
@@ -368,15 +393,11 @@ export default function PDFViewer({
     const range = document.createRange();
     range.setStart(bestNode, start);
     range.setEnd(bestNode, end);
-    const mark = document.createElement('mark');
-    mark.className = 'ai-source-highlight';
-    range.surroundContents(mark);
-    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [clearSourceHighlights, currentPage]);
+    setSourceRectsFromRange(range, pageContainer);
+  }, [clearSourceHighlights, currentPage, setSourceRectsFromRange]);
 
   useEffect(() => {
     if (!sourceFocusRequest || !isPDF) return;
-    if (!selectedFileId || sourceFocusRequest.fileId !== selectedFileId) return;
 
     // New citation request: allow one fresh highlight application.
     lastAppliedSourceFocusRef.current = null;
@@ -404,7 +425,7 @@ export default function PDFViewer({
         });
       }
     }, 120);
-  }, [sourceFocusRequest, isPDF, selectedFileId, onPageChange]);
+  }, [sourceFocusRequest, isPDF, onPageChange]);
 
   useEffect(() => {
     if (!activeSourceFocus || !isPDF) return;
@@ -445,8 +466,16 @@ export default function PDFViewer({
     if (text && text.length > 2) {
       const range = sel?.getRangeAt(0);
       const rect = range?.getBoundingClientRect();
-      if (rect) {
-        setSelState({ text, menuX: rect.left + rect.width / 2, menuY: rect.top - 10 });
+      if (rect && range) {
+        const captured = getSelectionCoords(range, text);
+        if (!captured) return;
+        setSelState({
+          text,
+          menuX: rect.left + rect.width / 2,
+          menuY: rect.top - 10,
+          pageNumber: captured.pageNumber,
+          selectionCoords: captured.selectionCoords,
+        });
         setAddingNote(false);
         setNoteAnchor(null);
       }
@@ -454,7 +483,7 @@ export default function PDFViewer({
       // Only clear if not in note editor
       if (!addingNote) setSelState(null);
     }
-  }, [snippetMode, addingNote]);
+  }, [snippetMode, addingNote, getSelectionCoords]);
 
   useEffect(() => {
     if (!isPDF) return;
@@ -467,16 +496,31 @@ export default function PDFViewer({
     if (!noteText.trim() || !classId || !selState) return;
     setSavingNote(true);
     try {
-      await fetch(`${API_URL}/students/classes/${classId}/notes`, {
+      const response = await fetch(`${API_URL}/students/classes/${classId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           content: noteText,
           fileId: selectedFileId,
-          pageNumber: currentPage,
+          pageNumber: selState.pageNumber,
           selectionText: selState.text,
+          selectionCoords: selState.selectionCoords,
         }),
       });
+
+      if (!response.ok) {
+        let message = 'Could not save note. Please try again.';
+        try {
+          const payload = await response.json();
+          if (payload?.message) {
+            message = Array.isArray(payload.message) ? payload.message.join(', ') : payload.message;
+          }
+        } catch {
+          // Ignore JSON parse errors and keep generic message.
+        }
+        throw new Error(message);
+      }
+
       setNoteText('');
       setAddingNote(false);
       setSelState(null);
@@ -485,6 +529,7 @@ export default function PDFViewer({
       await fetchNotes();
     } catch (e) {
       console.error('Failed to save note', e);
+      alert(e instanceof Error ? e.message : 'Could not save note. Please try again.');
     } finally {
       setSavingNote(false);
     }
@@ -502,6 +547,30 @@ export default function PDFViewer({
       console.error('Failed to delete note', e);
     }
   };
+
+  const getPageNoteRects = useCallback((note: SavedNote, pageNumber: number) => {
+    const raw = note.selectionCoords;
+    if (!raw || typeof raw !== 'object') return [] as Array<{ x: number; y: number; w: number; h: number }>;
+    const targetPage = typeof raw.pageNumber === 'number' ? raw.pageNumber : note.pageNumber;
+    if (targetPage !== pageNumber) return [];
+    const rects = Array.isArray(raw.rects) ? raw.rects : [];
+    return rects.filter((rect: any) => (
+      rect
+      && typeof rect.x === 'number'
+      && typeof rect.y === 'number'
+      && typeof rect.w === 'number'
+      && typeof rect.h === 'number'
+      && rect.w > 0
+      && rect.h > 0
+    ));
+  }, []);
+
+  const handleOverlayClick = useCallback((note: SavedNote, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setActiveNoteId(note.id);
+    setHoveredNote(note);
+    setTooltipPos({ x: event.clientX, y: event.clientY - 60 });
+  }, []);
 
   // ── Snippet capture ────────────────────────────────────────────────────────
   const handleDragDown = (e: React.MouseEvent) => {
@@ -597,6 +666,41 @@ export default function PDFViewer({
                   renderTextLayer
                   className="shadow-2xl rounded-sm"
                 />
+                <div className="absolute inset-0 z-10 pointer-events-none">
+                  {allNotes.flatMap(note => getPageNoteRects(note, i + 1).map((rect, idx) => (
+                    <button
+                      key={`${note.id}-${idx}`}
+                      type="button"
+                      title={note.content}
+                      onClick={(e) => handleOverlayClick(note, e)}
+                      className={`student-note-overlay ${activeNoteId === note.id ? 'active' : ''}`}
+                      style={{
+                        position: 'absolute',
+                        left: `${rect.x * 100}%`,
+                        top: `${rect.y * 100}%`,
+                        width: `${rect.w * 100}%`,
+                        height: `${rect.h * 100}%`,
+                      }}
+                    />
+                  )))}
+                </div>
+                {i + 1 === currentPage && sourceHighlightRects.length > 0 && (
+                  <div className="absolute inset-0 z-20 pointer-events-none">
+                    {sourceHighlightRects.map((rect, idx) => (
+                      <div
+                        key={`source-highlight-${idx}`}
+                        className="ai-source-overlay"
+                        style={{
+                          position: 'absolute',
+                          left: `${rect.x * 100}%`,
+                          top: `${rect.y * 100}%`,
+                          width: `${rect.w * 100}%`,
+                          height: `${rect.h * 100}%`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </Document>
@@ -632,7 +736,7 @@ export default function PDFViewer({
           <div className="min-w-0">
             <span className="text-sm font-bold truncate block max-w-[180px] text-slate-800" title={fileName}>{fileName}</span>
             {allNotes.length > 0 && (
-              <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">
                 {allNotes.filter(n => n.pageNumber === currentPage).length} note{allNotes.filter(n => n.pageNumber === currentPage).length !== 1 ? 's' : ''} on this page
               </span>
             )}
@@ -739,7 +843,7 @@ export default function PDFViewer({
                   }
                   setAddingNote(true);
                 }}
-                className="flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-white/10 transition-colors border-r border-white/10"
+                className="flex items-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-300 hover:bg-white/10 transition-colors border-r border-white/10"
               >
                 <Edit3 size={13} /> Note
               </button>
@@ -773,19 +877,19 @@ export default function PDFViewer({
             initial={{ opacity: 0, scale: 0.9, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute z-[200] bg-white rounded-2xl shadow-2xl border-2 border-amber-400 p-4 w-64"
+            className="absolute z-[200] bg-white rounded-2xl shadow-2xl border-2 border-blue-400 p-4 w-64"
             style={{ left: noteAnchor.x, top: noteAnchor.y }}
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-400" />
-                <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Pin Note</span>
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest">Pin Note</span>
               </div>
               <button onClick={() => { setAddingNote(false); setSelState(null); setNoteAnchor(null); window.getSelection()?.removeAllRanges(); }}>
                 <X size={14} className="text-slate-300 hover:text-red-400 transition-colors" />
               </button>
             </div>
-            <p className="text-[10px] text-slate-400 italic mb-3 border-l-2 border-amber-200 pl-2 line-clamp-2">
+            <p className="text-[10px] text-slate-400 italic mb-3 border-l-2 border-blue-200 pl-2 line-clamp-2">
               "{selState.text}"
             </p>
             <textarea
@@ -794,7 +898,7 @@ export default function PDFViewer({
               onChange={e => setNoteText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) handleSaveNote(); }}
               placeholder="Write your insight… (Ctrl+Enter to save)"
-              className="w-full h-24 bg-slate-50 rounded-xl p-3 text-xs font-bold outline-none border border-transparent focus:border-amber-300 focus:bg-white transition-all text-slate-800 resize-none"
+              className="w-full h-24 bg-slate-50 rounded-xl p-3 text-xs font-bold outline-none border border-transparent focus:border-blue-300 focus:bg-white transition-all text-slate-800 resize-none"
             />
             <div className="flex gap-2 mt-3">
               <button onClick={() => { setAddingNote(false); setSelState(null); setNoteAnchor(null); }} className="flex-1 py-2 rounded-lg border border-slate-200 text-[10px] font-black text-slate-400 uppercase hover:text-slate-600 transition-colors">
@@ -803,7 +907,7 @@ export default function PDFViewer({
               <button
                 onClick={handleSaveNote}
                 disabled={savingNote || !noteText.trim()}
-                className="flex-1 py-2.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
               >
                 {savingNote ? 'Saving…' : 'Pin ✦'}
               </button>
@@ -824,8 +928,8 @@ export default function PDFViewer({
           >
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Your Note · Page {hoveredNote.pageNumber}</span>
+                <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                <span className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Your Note · Page {hoveredNote.pageNumber}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => handleDeleteNote(hoveredNote.id)} className="p-1 rounded-md hover:bg-red-500/20 text-red-400 transition-colors" title="Delete note">
@@ -836,7 +940,7 @@ export default function PDFViewer({
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-400 italic mb-2 border-l-2 border-amber-400/40 pl-2 line-clamp-1">"{hoveredNote.selectionText}"</p>
+            <p className="text-xs text-slate-400 italic mb-2 border-l-2 border-blue-400/40 pl-2 line-clamp-1">"{hoveredNote.selectionText}"</p>
             <p className="text-sm font-bold text-white leading-relaxed">{hoveredNote.content}</p>
             <p className="text-[9px] text-slate-500 mt-2">{new Date(hoveredNote.createdAt).toLocaleDateString()}</p>
           </motion.div>
