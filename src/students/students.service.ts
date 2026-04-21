@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { FirebaseService } from '../firebase/firebase.service';
+import { CreateNoteDto } from './dto/create-note.dto';
+import { UpdateNoteDto } from './dto/update-note.dto';
 
 @Injectable()
 export class StudentsService {
@@ -177,7 +179,7 @@ export class StudentsService {
     });
   }
 
-  async createNote(studentId: string, subjectId: string, dto: any) {
+  async createNote(studentId: string, subjectId: string, dto: CreateNoteDto) {
     return this.prisma.note.create({
       data: {
         studentId,
@@ -186,12 +188,12 @@ export class StudentsService {
         fileId: dto.fileId || null,
         pageNumber: dto.pageNumber || null,
         selectionText: dto.selectionText || null,
-        selectionCoords: dto.selectionCoords || null,
+        selectionCoords: dto.selectionCoords ? (dto.selectionCoords as any) : undefined,
       }
     });
   }
 
-  async updateNote(studentId: string, noteId: string, dto: any) {
+  async updateNote(studentId: string, noteId: string, dto: UpdateNoteDto) {
     // Verify ownership
     const note = await this.prisma.note.findUnique({ where: { id: noteId } });
     if (!note || note.studentId !== studentId) {

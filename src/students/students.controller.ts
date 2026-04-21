@@ -3,6 +3,8 @@ import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import * as fs from 'fs';
+import { CreateNoteDto } from './dto/create-note.dto';
+import { UpdateNoteDto } from './dto/update-note.dto';
 
 @ApiTags('Students')
 @Controller('students')
@@ -77,14 +79,14 @@ export class StudentsController {
   @UseGuards(JwtAuthGuard)
   @Post('classes/:id/notes')
   @ApiOperation({ summary: 'Create a new note for a class' })
-  createNote(@Request() req: any, @Param('id') id: string, @Body() dto: any) {
+  createNote(@Request() req: any, @Param('id') id: string, @Body() dto: CreateNoteDto) {
     return this.studentsService.createNote(req.user.id, id, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('notes/:noteId')
   @ApiOperation({ summary: 'Update an existing note' })
-  updateNote(@Request() req: any, @Param('noteId') noteId: string, @Body() dto: any) {
+  updateNote(@Request() req: any, @Param('noteId') noteId: string, @Body() dto: UpdateNoteDto) {
     return this.studentsService.updateNote(req.user.id, noteId, dto);
   }
 
