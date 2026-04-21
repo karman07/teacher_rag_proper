@@ -10,6 +10,9 @@ import {
 import { useRouter } from 'next/navigation';
 import { studentApi, getQuestionsAsked } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
+import dynamic from 'next/dynamic';
+
+const AnalyticsPanel = dynamic(() => import('@/app/components/AnalyticsPanel'), { ssr: false });
 
 /* Light theme colors per class, minimal and clean */
 const COLORS = [
@@ -170,6 +173,15 @@ export default function StudentDashboard() {
               <p className="text-xs mt-1 font-medium text-slate-500">{stat.sub}</p>
             </motion.div>
           ))}
+        </motion.div>
+
+        {/* ── Analytics Panel ─────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.25 }}
+        >
+          <AnalyticsPanel />
         </motion.div>
 
         {/* ── Main Grid ───────────────────────────────────────── */}

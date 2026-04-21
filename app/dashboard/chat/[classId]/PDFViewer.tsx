@@ -25,6 +25,7 @@ interface PDFViewerProps {
     page?: number | null;
     chunkIdx?: number | null;
     snippet?: string | null;
+    yOffset?: number | null;
   } | null;
 }
 
@@ -87,7 +88,7 @@ export default function PDFViewer({
   const [hoveredNote, setHoveredNote] = useState<SavedNote | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const [sourceHighlightRects, setSourceHighlightRects] = useState<NormalizedRect[]>([]);
+  const [sourceHighlightPages, setSourceHighlightPages] = useState<Record<number, NormalizedRect[]>>({});
   const [activeSourceFocus, setActiveSourceFocus] = useState<{
     requestId: string;
     fileId: string;
@@ -134,40 +135,43 @@ export default function PDFViewer({
       style.id = styleId;
       style.textContent = `
         .student-note-overlay {
-          background: rgba(59, 130, 246, 0.18);
-          border-bottom: 1px solid rgba(37, 99, 235, 0.9);
-          border-radius: 3px;
+          background: rgba(253, 224, 71, 0.35);
+          border-bottom: 2px solid rgba(234, 179, 8, 0.9);
+          border-radius: 2px;
           cursor: pointer;
           transition: background 0.15s, box-shadow 0.2s;
           pointer-events: auto;
-          border: 0;
+          border-top: 0;
+          border-left: 0;
+          border-right: 0;
         }
         .student-note-overlay:hover {
-          background: rgba(59, 130, 246, 0.3);
-          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.22);
+          background: rgba(253, 224, 71, 0.55);
+          box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.4);
         }
         .student-note-overlay.active {
-          background: rgba(37, 99, 235, 0.28);
-          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.32);
+          background: rgba(234, 179, 8, 0.45);
+          box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.5);
         }
         .ai-source-highlight {
-          background: rgba(251, 191, 36, 0.22);
-          border-bottom: 1px solid rgba(245, 158, 11, 0.95);
+          background: rgba(251, 191, 36, 0.4);
+          border-bottom: 2px solid rgba(217, 119, 6, 0.95);
           border-radius: 2px;
           padding: 0;
           box-shadow: none;
-          animation: ai-source-pulse 1.6s ease-out 1;
+          animation: ai-source-pulse 2s ease-out 1;
         }
         .ai-source-overlay {
-          background: rgba(251, 191, 36, 0.2);
-          border-bottom: 1px solid rgba(245, 158, 11, 0.92);
+          background: rgba(253, 224, 71, 0.45);
+          border-bottom: 2px solid rgba(217, 119, 6, 0.95);
           border-radius: 2px;
           pointer-events: none;
-          animation: ai-source-pulse 1.2s ease-out 1;
+          animation: ai-source-pulse 1.8s ease-out 1;
         }
         @keyframes ai-source-pulse {
-          0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
-          100% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+          0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.8); background: rgba(253, 224, 71, 0.7); }
+          40%  { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.3); }
+          100% { box-shadow: 0 0 0 16px rgba(251, 191, 36, 0); background: rgba(253, 224, 71, 0.45); }
         }
         .react-pdf__Page__textContent span {
           cursor: text;
@@ -223,13 +227,13 @@ export default function PDFViewer({
   }, [currentPage]);
 
   const clearSourceHighlights = useCallback(() => {
-    setSourceHighlightRects([]);
+    setSourceHighlightPages({});
   }, []);
 
-  const setSourceRectsFromRange = useCallback((range: Range, pageContainer: HTMLElement) => {
+  const setSourceRectsFromRange = useCallback((range: Range, pageContainer: HTMLElement, pageNumber: number) => {
     const pageRect = pageContainer.getBoundingClientRect();
     if (!pageRect.width || !pageRect.height) {
-      setSourceHighlightRects([]);
+      setSourceHighlightPages({});
       return;
     }
 
@@ -253,12 +257,16 @@ export default function PDFViewer({
       })
       .filter((rect): rect is NormalizedRect => !!rect);
 
-    setSourceHighlightRects(rects);
+    if (rects.length > 0) {
+      setSourceHighlightPages({ [pageNumber]: rects });
+    }
   }, []);
 
-  const highlightSourceSnippet = useCallback((snippet?: string | null) => {
+  // highlightSourceSnippet: search within a specific page's text layer
+  const highlightSourceSnippet = useCallback((snippet?: string | null, targetPage?: number) => {
     clearSourceHighlights();
-    const pageContainer = pageRefs.current[currentPage];
+    const pageNum = targetPage ?? currentPage;
+    const pageContainer = pageRefs.current[pageNum];
     if (!pageContainer || !snippet) return;
 
     const textLayer = pageContainer.querySelector('.react-pdf__Page__textContent');
@@ -279,7 +287,6 @@ export default function PDFViewer({
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
-      // Backend snippets may include synthetic metadata lines that never appear in PDF text layers.
       .filter((line) => !/^\[(source|classification):/i.test(line))
       .join(' ')
       .replace(/\s+/g, ' ')
@@ -293,7 +300,8 @@ export default function PDFViewer({
       normalizedSnippet.slice(0, 180),
       normalizedSnippet.slice(0, 120),
       normalizedSnippet.slice(0, 80),
-    ].filter(s => s.length >= 24);
+      normalizedSnippet.slice(0, 50),
+    ].filter(s => s.length >= 20);
 
     let matchIdx = -1;
     let matchText = '';
@@ -316,7 +324,15 @@ export default function PDFViewer({
           const range = document.createRange();
           range.setStart(tn, startOffset);
           range.setEnd(tn, endOffset);
-          setSourceRectsFromRange(range, pageContainer);
+          setSourceRectsFromRange(range, pageContainer, pageNum);
+
+          // Scroll to the exact highlighted text position
+          const highlightRect = range.getBoundingClientRect();
+          const containerRect = containerRef.current?.getBoundingClientRect();
+          if (containerRect && containerRef.current && highlightRect.top) {
+            const scrollOffset = highlightRect.top - containerRect.top + containerRef.current.scrollTop - (containerRect.height / 3);
+            containerRef.current.scrollTo({ top: Math.max(0, scrollOffset), behavior: 'smooth' });
+          }
           return;
         }
         cursor += len;
@@ -350,11 +366,18 @@ export default function PDFViewer({
         }
       }
 
-      if (bestIdx >= 0 && bestPhrase.length >= 24) {
+      if (bestIdx >= 0 && bestPhrase.length >= 20) {
         const range = document.createRange();
         range.setStart(tn, bestIdx);
         range.setEnd(tn, Math.min(bestIdx + bestPhrase.length, tn.textContent?.length || 0));
-        setSourceRectsFromRange(range, pageContainer);
+        setSourceRectsFromRange(range, pageContainer, pageNum);
+
+        const highlightRect = range.getBoundingClientRect();
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        if (containerRect && containerRef.current && highlightRect.top) {
+          const scrollOffset = highlightRect.top - containerRect.top + containerRef.current.scrollTop - (containerRect.height / 3);
+          containerRef.current.scrollTo({ top: Math.max(0, scrollOffset), behavior: 'smooth' });
+        }
         return;
       }
     }
@@ -393,54 +416,114 @@ export default function PDFViewer({
     const range = document.createRange();
     range.setStart(bestNode, start);
     range.setEnd(bestNode, end);
-    setSourceRectsFromRange(range, pageContainer);
+    setSourceRectsFromRange(range, pageContainer, pageNum);
+
+    const highlightRect = range.getBoundingClientRect();
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (containerRect && containerRef.current && highlightRect.top) {
+      const scrollOffset = highlightRect.top - containerRect.top + containerRef.current.scrollTop - (containerRect.height / 3);
+      containerRef.current.scrollTo({ top: Math.max(0, scrollOffset), behavior: 'smooth' });
+    }
   }, [clearSourceHighlights, currentPage, setSourceRectsFromRange]);
 
+  // Effect: When a new sourceFocusRequest arrives, navigate to the page then trigger highlight
   useEffect(() => {
     if (!sourceFocusRequest || !isPDF) return;
 
-    // New citation request: allow one fresh highlight application.
     lastAppliedSourceFocusRef.current = null;
+    clearSourceHighlights();
 
-    setActiveSourceFocus({
+    const focus = {
       requestId: sourceFocusRequest.requestId,
       fileId: sourceFocusRequest.fileId,
       page: sourceFocusRequest.page,
       snippet: sourceFocusRequest.snippet,
-    });
+      yOffset: sourceFocusRequest.yOffset ?? 0,
+    };
+    setActiveSourceFocus(focus);
 
-    const targetPage = sourceFocusRequest.page && sourceFocusRequest.page > 0
-      ? sourceFocusRequest.page
-      : 1;
+    const targetPage = focus.page && focus.page > 0 ? focus.page : 1;
+
+    console.log('[PDFViewer] → page:', targetPage, '| y_offset:', focus.yOffset, '| snippet:', focus.snippet?.slice(0, 40));
 
     setCurrentPage(targetPage);
     onPageChange?.(targetPage);
 
-    setTimeout(() => {
-      const pageEl = pageRefs.current[targetPage];
-      if (pageEl && containerRef.current) {
-        containerRef.current.scrollTo({
-          top: Math.max(0, pageEl.offsetTop - 24),
-          behavior: 'smooth',
-        });
+    /**
+     * Reliable scroll: walk the offsetParent chain from the page element up to
+     * the scroll container to compute the TRUE absolute offsetTop.
+     * This is immune to overflow:hidden parents (unlike scrollIntoView) and
+     * does not depend on current scroll position (unlike getBoundingClientRect).
+     */
+    const getTrueOffset = (el: HTMLElement, container: HTMLElement): number => {
+      let offset = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== container) {
+        offset += node.offsetTop;
+        const parent = node.offsetParent as HTMLElement | null;
+        // Safety: if chain escapes the container, fall back to BoundingClientRect delta
+        if (!parent || !container.contains(parent)) {
+          const pageRect = el.getBoundingClientRect();
+          const cRect = container.getBoundingClientRect();
+          return container.scrollTop + (pageRect.top - cRect.top);
+        }
+        node = parent;
       }
-    }, 120);
-  }, [sourceFocusRequest, isPDF, onPageChange]);
+      return offset;
+    };
 
-  useEffect(() => {
-    if (!activeSourceFocus || !isPDF) return;
-    if (activeSourceFocus.page && activeSourceFocus.page !== currentPage) return;
+    const scrollToTargetPage = (): boolean => {
+      const pageEl = pageRefs.current[targetPage];
+      const container = containerRef.current;
+      if (!pageEl || !container) return false;
 
-    const applyKey = `${activeSourceFocus.requestId}:${currentPage}`;
-    if (lastAppliedSourceFocusRef.current === applyKey) return;
+      const pageAbsTop = getTrueOffset(pageEl, container);
+      // Add intra-page Y offset (fraction of rendered page height)
+      const yFraction = Math.max(0, Math.min(1, focus.yOffset ?? 0));
+      const inPagePx = pageEl.offsetHeight * yFraction;
+      // 80px visual margin so the target text isn't flush at the top
+      const finalTop = Math.max(0, pageAbsTop + inPagePx - 80);
 
-    const timeout = setTimeout(() => {
-      highlightSourceSnippet(activeSourceFocus.snippet);
-      lastAppliedSourceFocusRef.current = applyKey;
-    }, 420);
+      container.scrollTo({ top: finalTop, behavior: 'smooth' });
+      return true;
+    };
 
-    return () => clearTimeout(timeout);
-  }, [activeSourceFocus, currentPage, isPDF, highlightSourceSnippet]);
+    // Scroll once immediately. If the page ref isn't mounted yet, the poll will retry.
+    const didScroll = scrollToTargetPage();
+
+    // Poll ONLY for text-layer readiness — do NOT re-scroll on every tick.
+    // highlightSourceSnippet() runs its own fine-scroll to the exact matched text.
+    const applyKey = `${focus.requestId}:${targetPage}`;
+    let attempts = 0;
+    const maxAttempts = 12; // 12 × 200 ms = 2.4 s total
+
+    const tryHighlight = () => {
+      if (lastAppliedSourceFocusRef.current === applyKey) return;
+
+      const pageEl = pageRefs.current[targetPage];
+      const textLayer = pageEl?.querySelector('.react-pdf__Page__textContent');
+
+      // If the first scroll failed (page ref wasn't ready), retry it — but only once
+      if (!didScroll && attempts === 0) scrollToTargetPage();
+
+      attempts++;
+
+      if (textLayer && textLayer.childNodes.length > 0) {
+        // Text layer is ready — highlight handles its own precise scroll
+        lastAppliedSourceFocusRef.current = applyKey;
+        highlightSourceSnippet(focus.snippet, targetPage);
+      } else if (attempts < maxAttempts) {
+        highlightTimer = setTimeout(tryHighlight, 200);
+      } else {
+        // Timed out — at least the page scroll already happened
+        lastAppliedSourceFocusRef.current = applyKey;
+      }
+    };
+
+    let highlightTimer = setTimeout(tryHighlight, 300);
+    return () => clearTimeout(highlightTimer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceFocusRequest]);
 
   // ── Page intersection observer ─────────────────────────────────────────────
   useEffect(() => {
@@ -684,9 +767,10 @@ export default function PDFViewer({
                     />
                   )))}
                 </div>
-                {i + 1 === currentPage && sourceHighlightRects.length > 0 && (
+                {/* Source highlight overlay — shown on whichever page has highlight rects */}
+                {sourceHighlightPages[i + 1]?.length > 0 && (
                   <div className="absolute inset-0 z-20 pointer-events-none">
-                    {sourceHighlightRects.map((rect, idx) => (
+                    {sourceHighlightPages[i + 1].map((rect, idx) => (
                       <div
                         key={`source-highlight-${idx}`}
                         className="ai-source-overlay"
@@ -877,13 +961,13 @@ export default function PDFViewer({
             initial={{ opacity: 0, scale: 0.9, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute z-[200] bg-white rounded-2xl shadow-2xl border-2 border-blue-400 p-4 w-64"
+            className="absolute z-[200] bg-white rounded-2xl shadow-2xl border-2 border-amber-400 p-4 w-64"
             style={{ left: noteAnchor.x, top: noteAnchor.y }}
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest">Pin Note</span>
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Pin Note</span>
               </div>
               <button onClick={() => { setAddingNote(false); setSelState(null); setNoteAnchor(null); window.getSelection()?.removeAllRanges(); }}>
                 <X size={14} className="text-slate-300 hover:text-red-400 transition-colors" />
@@ -928,8 +1012,8 @@ export default function PDFViewer({
           >
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                <span className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Your Note · Page {hoveredNote.pageNumber}</span>
+                <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Your Note · Page {hoveredNote.pageNumber}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => handleDeleteNote(hoveredNote.id)} className="p-1 rounded-md hover:bg-red-500/20 text-red-400 transition-colors" title="Delete note">
@@ -940,7 +1024,7 @@ export default function PDFViewer({
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-400 italic mb-2 border-l-2 border-blue-400/40 pl-2 line-clamp-1">"{hoveredNote.selectionText}"</p>
+            <p className="text-xs text-slate-400 italic mb-2 border-l-2 border-amber-400/60 pl-2 line-clamp-1">"{hoveredNote.selectionText}"</p>
             <p className="text-sm font-bold text-white leading-relaxed">{hoveredNote.content}</p>
             <p className="text-[9px] text-slate-500 mt-2">{new Date(hoveredNote.createdAt).toLocaleDateString()}</p>
           </motion.div>

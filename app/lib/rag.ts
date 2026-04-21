@@ -16,6 +16,7 @@ export interface RAGSource {
   image_index?: number | null;
   content_type?: string | null;
   snippet?: string | null;
+  y_offset?: number | null;  // normalized Y position (0–1) within the PDF page
 }
 
 export interface RAGQueryResponse {

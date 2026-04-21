@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { studentApi, incrementQuestionsAsked } from '@/app/lib/api';
 import { queryRAG, ChatMessage, RAGSource } from '@/app/lib/rag';
+import { saveQuestionRecord } from '@/app/lib/analytics';
 
 interface AugmentedMessage extends ChatMessage {
   id: string;
@@ -27,6 +28,7 @@ type SourceFocusRequest = {
   page?: number | null;
   chunkIdx?: number | null;
   snippet?: string | null;
+  yOffset?: number | null;
 };
 
 const renderInline = (
@@ -35,14 +37,42 @@ const renderInline = (
   sources: RAGSource[] = [],
   onSourceClick?: (source: RAGSource) => void,
 ) => {
-  // Split on **bold** and `code` patterns
-  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?)/gi);
+  // Split on **bold**, `code`, inline source references [Source: ...], and (Source N) patterns
+  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\[Source:\s*[^\]]+\]|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?)/gi);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 bg-blue-100/30 px-1 rounded-md'}`}>{part.slice(2, -2)}</strong>;
+      return <strong key={i} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 bg-amber-100/50 px-1 rounded-md'}`}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
       return <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-blue-700 font-mono text-xs font-bold">{part.slice(1, -1)}</code>;
+    }
+
+    // Inline [Source: filename.pdf, chunk N] pattern
+    const inlineSourceMatch = part.match(/^\[Source:\s*([^,\]]+?)(?:,?\s*chunk\s*(\d+)|,?\s*Page\s*(\d+))?\s*\]$/i);
+    if (inlineSourceMatch && sources.length && onSourceClick && role === 'assistant') {
+      const refName = inlineSourceMatch[1].trim();
+      const chunkIdx = inlineSourceMatch[2] ? parseInt(inlineSourceMatch[2]) - 1 : null;
+      // Find best matching source
+      const src = sources.find(s =>
+        (s.file_name || '').toLowerCase().includes(refName.toLowerCase()) ||
+        refName.toLowerCase().includes((s.file_name || '').toLowerCase().split('/').pop()?.toLowerCase() || '')
+        || (chunkIdx !== null && s.chunk_idx === chunkIdx)
+      ) || sources[0];
+      if (src) {
+        const srcIdx = sources.indexOf(src);
+        const label = `Source ${srcIdx + 1}`;
+        return (
+          <button
+            key={i}
+            onClick={() => onSourceClick(src)}
+            title={src.page ? `Jump to Source ${srcIdx + 1} (page ${src.page})` : `Jump to Source ${srcIdx + 1}`}
+            className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 rounded-md text-[10px] font-black text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 hover:border-amber-400 transition-all cursor-pointer underline-offset-2 group"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="shrink-0"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            {label}{src.page ? ` · p${src.page}` : ''}
+          </button>
+        );
+      }
     }
 
     if (/Source\s+\d+/i.test(part) && sources.length && onSourceClick) {
@@ -61,14 +91,11 @@ const renderInline = (
               <button
                 key={`${i}-${bi}`}
                 onClick={() => onSourceClick(src)}
-                className={`underline decoration-2 underline-offset-2 font-black transition-colors ${
-                  role === 'user'
-                    ? 'text-white/90 hover:text-white'
-                    : 'text-blue-600 hover:text-blue-800'
-                }`}
-                title={src.page ? `Open cited context (page ${src.page})` : 'Open cited context'}
+                className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 rounded-md text-[10px] font-black text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 hover:border-amber-400 transition-all"
+                title={src.page ? `Jump to Source ${sourceIdx + 1} (page ${src.page})` : `Jump to Source ${sourceIdx + 1}`}
               >
-                {bit}
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Source {sourceIdx + 1}{src.page ? ` · p${src.page}` : ''}
               </button>
             );
           })}
@@ -123,24 +150,27 @@ const MarkdownContent = ({
     if (!trimmed) { result.push(<div key={i} className="h-2" />); i++; continue; }
 
     // Source footer line from model output (e.g. "Source: ...")
-    if (/^source\s*:/i.test(trimmed) && role === 'assistant' && sources && sources.length && onSourceClick) {
+    // Also handles standalone [Source: file.pdf, chunk N] lines
+    const isSourceLine = /^source\s*:/i.test(trimmed) || /^\[source:/i.test(trimmed);
+    if (isSourceLine && role === 'assistant' && sources && sources.length && onSourceClick) {
       result.push(
-        <p key={i} className="leading-relaxed text-sm">
-          <span className="font-black text-slate-700">Source: </span>
-          {sources.slice(0, 6).map((src, idx) => (
-            <span key={`${src.file_id}-${idx}`}>
+        <div key={i} className="mt-3 pt-3 border-t border-slate-100">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Sources</p>
+          <div className="flex flex-wrap gap-1.5">
+            {sources.slice(0, 6).map((src, idx) => (
               <button
+                key={`${src.file_id}-${idx}`}
                 onClick={() => onSourceClick(src)}
-                className="underline decoration-2 underline-offset-2 font-black text-amber-700 hover:text-amber-900 transition-colors"
-                title={src.page ? `Open cited context (page ${src.page})` : 'Open cited context'}
+                title={src.snippet ? `"${src.snippet.slice(0, 80)}…"` : `Jump to Source ${idx + 1}${src.page ? ` (page ${src.page})` : ''}`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 hover:border-amber-400 transition-all shadow-sm group"
               >
-                {src.file_name?.split('/').pop()?.substring(0, 28) || `Source ${idx + 1}`}
-                {src.page ? ` (P${src.page})` : ''}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="shrink-0 text-amber-600"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                <span>Source {idx + 1}</span>
+                {src.page && <span className="text-amber-500 font-black">· p{src.page}</span>}
               </button>
-              {idx < Math.min(6, sources.length) - 1 ? <span>{', '}</span> : null}
-            </span>
-          ))}
-        </p>
+            ))}
+          </div>
+        </div>
       );
       i++;
       continue;
@@ -260,6 +290,14 @@ export default function ClassroomPage() {
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
     incrementQuestionsAsked();
+    // Track question for analytics
+    if (q) {
+      saveQuestionRecord(
+        q,
+        classId,
+        classroom?.name || 'Unknown Subject',
+      );
+    }
 
     try {
       const res = await queryRAG(
@@ -291,19 +329,22 @@ export default function ClassroomPage() {
   };
 
   const handleSourceClick = useCallback((source: RAGSource) => {
-    const f = files.find((item: any) => item.id === source.file_id);
+    // Try to find the exact file; fall back to selectedFile so the click never silently fails
+    const f = files.find((item: any) => item.id === source.file_id) ?? selectedFile;
+    console.log('[handleSourceClick] file_id:', source.file_id, '| found:', !!f, '| page:', source.page, '| files:', files.map((x: any) => x.id));
     if (!f) return;
 
     setSelectedFile(f);
     setShowDoc(true);
     setSourceFocusRequest({
       requestId: crypto.randomUUID(),
-      fileId: source.file_id,
+      fileId: f.id,          // use the matched file's actual id
       page: source.page,
       chunkIdx: source.chunk_idx,
       snippet: source.snippet,
+      yOffset: source.y_offset ?? null,
     });
-  }, [files]);
+  }, [files, selectedFile]);
 
   const filteredFiles = files.filter((f: any) =>
     (f.displayName || f.name || f.originalName || '').toLowerCase().includes(searchQ.toLowerCase())
@@ -619,6 +660,54 @@ export default function ClassroomPage() {
                               onSourceClick={handleSourceClick}
                             />
                           </div>
+
+                          {/* ── Formal Sources Reference Panel ── */}
+                          {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                            <div className="w-full mt-1 px-1">
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 overflow-hidden">
+                                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200 bg-white">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-500"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Referenced Sources</span>
+                                  <span className="ml-auto text-[9px] font-bold text-slate-400">{msg.sources.length} citation{msg.sources.length !== 1 ? 's' : ''}</span>
+                                </div>
+                                <div className="divide-y divide-slate-100">
+                                  {msg.sources.slice(0, 5).map((src, idx) => (
+                                    <button
+                                      key={`${src.file_id}-${idx}`}
+                                      onClick={() => handleSourceClick(src)}
+                                      className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-amber-50 transition-colors group"
+                                      title={src.snippet ? src.snippet.slice(0, 100) : `Jump to Source ${idx + 1}${src.page ? ` (page ${src.page})` : ''}`}
+                                    >
+                                      <span className="shrink-0 w-5 h-5 rounded-md bg-slate-200 group-hover:bg-amber-200 flex items-center justify-center text-[9px] font-black text-slate-600 group-hover:text-amber-800 transition-colors mt-0.5">{idx + 1}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs font-bold text-slate-700 group-hover:text-amber-800 transition-colors truncate">
+                                            Source {idx + 1}
+                                          </span>
+                                          {src.page && (
+                                            <span className="shrink-0 text-[9px] font-black text-slate-400 bg-slate-100 group-hover:bg-amber-100 group-hover:text-amber-700 px-1.5 py-0.5 rounded transition-colors">
+                                              Page {src.page}
+                                            </span>
+                                          )}
+                                          {src.relevance && (
+                                            <span className="shrink-0 text-[9px] font-bold text-emerald-600 tabular-nums ml-auto">
+                                              {Math.round(src.relevance * 100)}% match
+                                            </span>
+                                          )}
+                                        </div>
+                                        {src.snippet && (
+                                          <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1 italic leading-relaxed">
+                                            "{src.snippet.slice(0, 90)}{src.snippet.length > 90 ? '…' : ''}"
+                                          </p>
+                                        )}
+                                      </div>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 mt-1 text-slate-300 group-hover:text-amber-500 transition-colors"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     ))

@@ -27,7 +27,7 @@ export default function Home() {
 
         <div className="flex items-center gap-4">
           <Link href="/login">
-            <button className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all" style={{ color: 'var(--primary)', border: '2px solid var(--primary-light)', background: 'transparent' }}
+            <button className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all" style={{ color: 'black', border: '2px solid var(--primary-light)', background: 'transparent' }}
               onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary-light)'}
               onMouseOut={e  => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
             >
