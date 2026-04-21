@@ -54,7 +54,6 @@ class RAGEngine:
         self._gemini_api_key = (cfg.gemini_api_key or "").strip()
         self._gemini_enabled = bool(self._gemini_api_key)
         self._embed_model = "models/gemini-embedding-001"
-<<<<<<< Updated upstream
         self._gen_model = None
         self._vision_model = None
 
@@ -67,9 +66,6 @@ class RAGEngine:
             logger.warning(
                 "GEMINI_API_KEY is not set; the app will start, but ingest/query features are disabled until it is configured."
             )
-=======
-        self._gen_model   = genai.GenerativeModel("gemini-2.5-flash")
->>>>>>> Stashed changes
 
         # ChromaDB persistent client
         os.makedirs(cfg.chroma_persist_dir, exist_ok=True)
@@ -637,7 +633,10 @@ Knowledge Base Context (Curriculum Materials):
         question_terms = set(re.findall(r"[a-z0-9]{4,}", effective_question.lower()))
 
         def _build_relevant_snippet(chunk_text: str) -> str:
-            clean = re.sub(r"\s+", " ", chunk_text).strip()
+            lines = [ln.strip() for ln in chunk_text.splitlines() if ln.strip()]
+            # Remove synthetic ingest headers that are useful for metadata but noisy for viewer highlighting.
+            lines = [ln for ln in lines if not re.match(r"^\[(Source|Classification):", ln, flags=re.IGNORECASE)]
+            clean = re.sub(r"\s+", " ", " ".join(lines)).strip()
             if not clean:
                 return ""
 
