@@ -124,8 +124,8 @@ export default function SubjectsManager() {
         </div>
         <Button 
           onPress={() => setCreating(true)}
-          className="font-black bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-          startContent={<Plus size={18} />}
+          className="font-black bg-white dark:bg-black text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800/60 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-950 transition-all"
+          startContent={<Plus size={18} className="text-slate-600 dark:text-slate-400" />}
         >
           New Subject
         </Button>
@@ -171,9 +171,8 @@ export default function SubjectsManager() {
                     {/* Card Content Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform group-hover:scale-110"
-                          style={{ background: `linear-gradient(135deg, ${COLORS.primary[600]}, ${COLORS.primary[400]})` }}>
-                          <BookOpen size={20} className="text-white" />
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform group-hover:scale-110 bg-white dark:bg-black border border-slate-200 dark:border-slate-800/50">
+                          <BookOpen size={20} className="text-slate-800 dark:text-slate-200" />
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
@@ -191,7 +190,7 @@ export default function SubjectsManager() {
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Classroom Identifier</span>
                             <div className="w-1 h-1 rounded-full bg-slate-300" />
-                            <span className="text-[10px] font-bold text-blue-600 uppercase">Active</span>
+                             <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 uppercase">Active</span>
                           </div>
                         </div>
                       </div>
@@ -233,19 +232,19 @@ export default function SubjectsManager() {
                     
                     {/* Class Code Section */}
                     {s.classCode && (
-                      <div className="mt-4 p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/50 flex items-center justify-between group/code">
+                      <div className="mt-4 p-3 rounded-2xl bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800/60 flex items-center justify-between group/code shadow-sm dark:shadow-none">
                         <div>
-                          <p className="text-[9px] font-black uppercase tracking-widest text-blue-400 mb-0.5">Quick Access Code</p>
-                          <p className="text-base font-black text-blue-700 dark:text-blue-400 tracking-[0.2em]">{s.classCode}</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Quick Access Code</p>
+                          <p className="text-base font-black text-slate-900 dark:text-white tracking-[0.2em]">{s.classCode}</p>
                         </div>
                         <Button 
                           isIconOnly 
                           size="sm" 
                           variant="solid" 
-                          className="h-8 w-8 min-w-8 bg-white dark:bg-blue-600 shadow-sm border border-blue-100 dark:border-blue-700"
+                          className="h-8 w-8 min-w-8 bg-white dark:bg-black shadow-sm border border-slate-200 dark:border-slate-700"
                           onClick={() => copyToClipboard(s.classCode!, s.id)}
                         >
-                          {copiedId === s.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-blue-600 dark:text-white" />}
+                          {copiedId === s.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-slate-400 group-hover/code:text-slate-700 dark:group-hover/code:text-slate-200 transition-colors" />}
                         </Button>
                       </div>
                     )}
@@ -263,9 +262,9 @@ export default function SubjectsManager() {
                       <Button
                         variant="flat"
                         size="sm"
-                        className="bg-blue-600 text-white font-black text-[11px] uppercase tracking-widest h-8"
+                        className="bg-slate-100 dark:bg-black hover:bg-slate-200 dark:hover:bg-slate-950 text-slate-800 dark:text-white font-black text-[11px] uppercase tracking-widest h-8 border border-slate-200 dark:border-slate-800/60"
                         onPress={() => router.push(`/dashboard/files?subjectId=${s.id}`)}
-                        endContent={<ChevronRight size={14} />}
+                        endContent={<ChevronRight size={14} className="text-slate-500 dark:text-slate-400" />}
                       >
                         Manage Class
                       </Button>
