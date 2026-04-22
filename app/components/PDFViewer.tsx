@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { Button, Spinner } from '@heroui/react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, FileText } from 'lucide-react';
-
-// Set up the worker for react-pdf
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+import { useState, useCallback, useMemo } from 'react';
+import { Viewer, Worker } from '@react-pdf-viewer/core';
+import { zoomPlugin } from '@react-pdf-viewer/zoom';
+import '@react-pdf-viewer/core/lib/styles/index.css';
+import '@react-pdf-viewer/zoom/lib/styles/index.css';
+import { Button } from '@heroui/react';
+import { ZoomIn, ZoomOut, Download, FileText } from 'lucide-react';
 
 interface PDFViewerProps {
   url: string;
@@ -14,14 +14,26 @@ interface PDFViewerProps {
 }
 
 export default function PDFViewer({ url, fileName }: PDFViewerProps) {
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
 
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages);
-    setPageNumber(1);
-  }
+  const zoomPluginInstance = zoomPlugin();
+  const plugins = useMemo(() => [zoomPluginInstance], [zoomPluginInstance]);
+
+  const handleZoomIn = useCallback(() => {
+    setScale(prev => {
+      const next = Math.min(2.0, prev + 0.1);
+      zoomPluginInstance.zoomTo(next);
+      return next;
+    });
+  }, [zoomPluginInstance]);
+
+  const handleZoomOut = useCallback(() => {
+    setScale(prev => {
+      const next = Math.max(0.5, prev - 0.1);
+      zoomPluginInstance.zoomTo(next);
+      return next;
+    });
+  }, [zoomPluginInstance]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner">
@@ -35,41 +47,16 @@ export default function PDFViewer({ url, fileName }: PDFViewerProps) {
         </div>
 
         <div className="flex items-center gap-1">
-          <Button isIconOnly size="sm" variant="light" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
+          <Button isIconOnly size="sm" variant="light" onClick={handleZoomOut}>
             <ZoomOut size={16} />
           </Button>
           <span className="text-[10px] font-black w-10 text-center">{Math.round(scale * 100)}%</span>
-          <Button isIconOnly size="sm" variant="light" onClick={() => setScale(s => Math.min(2.0, s + 0.1))}>
+          <Button isIconOnly size="sm" variant="light" onClick={handleZoomIn}>
             <ZoomIn size={16} />
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 mr-2">
-            <Button 
-                isIconOnly 
-                size="sm" 
-                variant="flat" 
-                disabled={pageNumber <= 1} 
-                onClick={() => setPageNumber(p => Math.max(1, p - 1))}
-                className="rounded-lg h-7 w-7"
-            >
-              <ChevronLeft size={14} />
-            </Button>
-            <span className="text-[10px] font-black min-w-[50px] text-center">
-              {pageNumber} / {numPages || '--'}
-            </span>
-            <Button 
-                isIconOnly 
-                size="sm" 
-                variant="flat" 
-                disabled={numPages ? pageNumber >= numPages : true} 
-                onClick={() => setPageNumber(p => Math.min(numPages || p, p + 1))}
-                className="rounded-lg h-7 w-7"
-            >
-              <ChevronRight size={14} />
-            </Button>
-          </div>
           <Button isIconOnly size="sm" variant="light" onClick={() => window.open(url, '_blank')}>
             <Download size={16} />
           </Button>
@@ -77,34 +64,10 @@ export default function PDFViewer({ url, fileName }: PDFViewerProps) {
       </div>
 
       {/* PDF Content */}
-      <div className="flex-1 overflow-auto p-4 flex justify-center scrollbar-hide bg-slate-100 dark:bg-slate-950/50">
-        <Document
-          file={url}
-          onLoadSuccess={onDocumentLoadSuccess}
-          loading={
-            <div className="flex flex-col items-center justify-center p-20 gap-4">
-              <Spinner size="lg" color="primary" />
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Document...</p>
-            </div>
-          }
-          error={
-             <div className="flex flex-col items-center justify-center p-20 text-center">
-                <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-4">
-                    <FileText size={32} />
-                </div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Failed to load PDF</h3>
-                <p className="text-xs font-medium text-slate-500">Please check your connection or try again later.</p>
-             </div>
-          }
-        >
-          <Page 
-            pageNumber={pageNumber} 
-            scale={scale} 
-            renderTextLayer={false} 
-            renderAnnotationLayer={false}
-            className="shadow-2xl rounded-sm overflow-hidden"
-          />
-        </Document>
+      <div className="flex-1 overflow-auto p-4 flex justify-center scrollbar-hide bg-slate-100 dark:bg-slate-950/50 relative">
+        <Worker workerUrl={`//unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
+          <Viewer fileUrl={url} defaultScale={scale} plugins={plugins} />
+        </Worker>
       </div>
     </div>
   );
