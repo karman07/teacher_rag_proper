@@ -61,6 +61,7 @@ class IngestRequest(BaseModel):
     file_id:         str = Field(..., description="UUID of the KnowledgeFile record")
     file_path:       str = Field(..., description="Absolute path to the file on disk")
     file_name:       str = Field(..., description="Original filename for display")
+    is_assignment:   bool = Field(default=False, description="Whether this file is an assignment (hints only)")
 
 
 class IngestResponse(BaseModel):
@@ -126,6 +127,7 @@ async def ingest_file(req: IngestRequest):
             file_id=req.file_id,
             file_path=req.file_path,
             file_name=req.file_name,
+            is_assignment=req.is_assignment,
         )
         return IngestResponse(
             success=True,

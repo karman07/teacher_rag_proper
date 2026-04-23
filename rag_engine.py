@@ -123,6 +123,77 @@ class RAGEngine:
             logger.error(f"[vision] failed to describe {file_path}: {e}")
             return ""
 
+    async def _describe_video_content(self, file_path: str, mime_type: str) -> str:
+        self._require_gemini("Video captioning")
+        logger.info(f"[vision] describing video at {file_path}")
+        try:
+            def _upload_and_describe():
+                import time
+                import google.generativeai as genai
+                video_file = genai.upload_file(path=file_path)
+                
+                # wait until active
+                while video_file.state.name == "PROCESSING":
+                    time.sleep(2)
+                    video_file = genai.get_file(video_file.name)
+                
+                if video_file.state.name == "FAILED":
+                    raise ValueError("Video processing failed.")
+
+                prompt = (
+                    "Act as an expert educational content indexer for a RAG pipeline. Your goal is to convert this video into a highly searchable text representation.\n\n"
+                    "1. TRANSCRIPT: Provide a comprehensive, timestamped transcript of all spoken audio. Preserve every technical term and key factual statement.\n"
+                    "2. VISUALS: Identify and describe all on-screen text, charts, diagrams, and significant visual demonstrations.\n"
+                    "3. KEY TAKEAWAYS: List the primary educational points covered.\n\n"
+                    "FORMATTING: Use a dense, keyword-rich style. Remove all conversational filler (um, ah, etc.) and redundant pleasantries to maximize RAG retrieval accuracy and minimize token overhead."
+                )
+                
+                response = self._gen_model.generate_content([prompt, video_file], request_options={"timeout": 600})
+                
+                # cleanup
+                genai.delete_file(video_file.name)
+                return response.text.strip()
+                
+            return await asyncio.to_thread(_upload_and_describe)
+        except Exception as e:
+            logger.error(f"[vision] failed to describe video {file_path}: {e}")
+            return ""
+
+    async def _describe_audio_content(self, file_path: str, mime_type: str) -> str:
+        self._require_gemini("Audio transcription")
+        logger.info(f"[vision] transcribing audio at {file_path}")
+        try:
+            def _upload_and_describe():
+                import time
+                import google.generativeai as genai
+                audio_file = genai.upload_file(path=file_path)
+                
+                # wait until active
+                while audio_file.state.name == "PROCESSING":
+                    time.sleep(2)
+                    audio_file = genai.get_file(audio_file.name)
+                
+                if audio_file.state.name == "FAILED":
+                    raise ValueError("Audio processing failed.")
+
+                prompt = (
+                    "Act as an expert educational content indexer for a RAG pipeline. Your goal is to convert this audio into a highly searchable text representation.\n\n"
+                    "1. TRANSCRIPT: Provide a comprehensive, timestamped transcript of all spoken audio. Preserve every technical term and key factual statement.\n"
+                    "2. KEY TAKEAWAYS: List the primary educational points covered in this session.\n\n"
+                    "FORMATTING: Use a dense, keyword-rich style. Remove all conversational filler and redundant pleasantries to maximize RAG retrieval accuracy and minimize token overhead."
+                )
+                
+                response = self._gen_model.generate_content([prompt, audio_file], request_options={"timeout": 600})
+                
+                # cleanup
+                genai.delete_file(audio_file.name)
+                return response.text.strip()
+                
+            return await asyncio.to_thread(_upload_and_describe)
+        except Exception as e:
+            logger.error(f"[vision] failed to transcribe audio {file_path}: {e}")
+            return ""
+
     def _ensure_blip_loaded(self) -> None:
         """Lazy-load BLIP only when requested to keep startup fast."""
         if self._blip_processor is not None and self._blip_model is not None:
@@ -271,10 +342,23 @@ class RAGEngine:
                 page_num = page_idx + 1
 
                 page_text = (page.get_text("text") or "").strip()
+                page_height = max(1.0, float(page.rect.height))
+
+                # Extract text blocks with Y positions for intra-page chunk targeting
+                text_blocks_pos: list[tuple[float, str]] = []
+                for blk in (page.get_text("blocks") or []):
+                    # blocks format: (x0, y0, x1, y1, text, block_no, type)
+                    if len(blk) >= 7 and int(blk[6]) == 0:  # type 0 = text block
+                        blk_text = (blk[4] or "").strip()
+                        if blk_text:
+                            y_norm = round(float(blk[1]) / page_height, 4)
+                            text_blocks_pos.append((y_norm, blk_text[:200]))
+
                 if page_text:
                     units.append({
                         "kind": "pdf_text",
                         "page": page_num,
+                        "text_blocks_pos": text_blocks_pos,
                         "content": (
                             f"[Source: {file_name} (PDF)]\n"
                             f"[Classification: Text | Page {page_num}]\n"
@@ -361,6 +445,7 @@ class RAGEngine:
         file_id: str,
         file_path: str,
         file_name: str,
+        is_assignment: bool = False,
     ) -> dict:
         """
         Parse the document, including visual descriptions for images/graphs, chunk it,
@@ -384,6 +469,37 @@ class RAGEngine:
                     f"{visual_desc}"
                 ),
             })
+        elif ext in ('.mp4', '.mov', '.avi', '.mkv', '.webm'):
+            if ext == '.mov': mime = "video/quicktime"
+            elif ext == '.avi': mime = "video/x-msvideo"
+            elif ext == '.mkv': mime = "video/x-matroska"
+            else: mime = f"video/{ext[1:]}"
+            
+            visual_desc = await self._describe_video_content(file_path, mime)
+            units.append({
+                "kind": "video",
+                "page": None,
+                "content": (
+                    f"[Source: {file_name} (Video)]\n"
+                    "[Classification: Video]\n"
+                    f"{visual_desc}"
+                ),
+            })
+        elif ext in ('.mp3', '.wav', '.aac', '.m4a'):
+            if ext == '.mp3': mime = "audio/mpeg"
+            elif ext == '.m4a': mime = "audio/x-m4a"
+            else: mime = f"audio/{ext[1:]}"
+            
+            audio_desc = await self._describe_audio_content(file_path, mime)
+            units.append({
+                "kind": "audio",
+                "page": None,
+                "content": (
+                    f"[Source: {file_name} (Audio)]\n"
+                    "[Classification: Audio]\n"
+                    f"{audio_desc}"
+                ),
+            })
         elif ext == '.pdf':
             units = await self._extract_pdf_units(file_path, file_name)
         else:
@@ -405,6 +521,11 @@ class RAGEngine:
             if unit.get("kind") in ("image", "pdf_image"):
                 # Keep one chunk per visual unit for predictable counts and source mapping.
                 chunk_records.append((unit["content"], unit))
+            elif unit.get("kind") == "video":
+                # Video descriptions might be long, so chunk them as normal text
+                unit_chunks = self._chunk_text(unit["content"], min_len=50)
+                for chunk in unit_chunks:
+                    chunk_records.append((chunk, unit))
             else:
                 unit_chunks = self._chunk_text(unit["content"], min_len=50)
                 for chunk in unit_chunks:
@@ -431,13 +552,16 @@ class RAGEngine:
             ids.append(chunk_id)
             docs.append(chunk)
             metas.append({
-                "file_id":   file_id,
+                "file_id": file_id,
                 "file_name": file_name,
-                "chunk_idx": i,
                 "teacher_id": teacher_id,
-                "content_type": unit.get("kind", "unknown"),
+                "is_assignment": str(is_assignment).lower(),
+                "content_type": unit.get("kind", "text"),
+                "chunk_idx": i,
                 "page": int(unit.get("page") or -1),
                 "image_index": int(unit.get("image_index") or -1),
+                "y_offset": self._find_y_offset(chunk, unit),
+                "snippet": chunk[:200],
             })
 
         for start in range(0, len(ids), batch_size):
@@ -549,11 +673,25 @@ class RAGEngine:
 
         # 4. Build context string
         context_parts = []
+        is_assignment_mode = False
         for i, (chunk, meta) in enumerate(zip(chunks, metadatas)):
+            if str(meta.get("is_assignment", "")).lower() == "true":
+                is_assignment_mode = True
             context_parts.append(
                 f"[Source {i+1}: {meta.get('file_name', 'unknown')} | chunk {meta.get('chunk_idx', '?')}]\n{chunk}"
             )
         context = "\n\n---\n\n".join(context_parts)
+
+        assignment_protocol = ""
+        if is_assignment_mode:
+            assignment_protocol = """
+## ASSIGNMENT PROTOCOL (STRICT ENFORCEMENT)
+The knowledge base context includes materials marked as **ASSIGNMENTS**. For these specific materials:
+- **STRICTLY PROHIBITED**: Do NOT provide the final answer, solution, or completed work.
+- **MANDATORY**: Only provide **HINTS**, guidance, and conceptual explanations.
+- **STRATEGY**: Guide the student step-by-step. Ask probing questions like "What do you think the next step after X would be?" or "Have you considered how Y affects Z?".
+- **TONE**: Be a supportive coach. Start by saying: "Since this is related to an assignment, I'll guide you with hints and concepts to help you solve it yourself!"
+"""
 
         # 5. Build prompt
         history_text = ""
@@ -588,11 +726,8 @@ class RAGEngine:
 - Do NOT invent facts or hallucinate content not grounded in the knowledge base.
 - Explain concepts at a university level — thorough, accurate, and pedagogically clear.
 
-### Tone
-- Act as a knowledgeable TA, not a cautious chatbot.
-- Be encouraging but precise.
 - For complex topics, break them down step-by-step.
-
+{assignment_protocol}
 ---
 
 Recent Conversation History:
@@ -675,6 +810,12 @@ Knowledge Base Context (Curriculum Materials):
             seen_refs.add(ref_key)
 
             page_val = int(meta.get("page", -1))
+            # Fallback: extract page from embedded chunk header for old data that lacks page metadata
+            # Every chunk starts with "[Classification: Text | Page N]" so this always works
+            if page_val < 0 and chunk:
+                _pm = re.search(r'\[Classification:[^\]]*\bPage\s+(\d+)\b', chunk, re.IGNORECASE)
+                if _pm:
+                    page_val = int(_pm.group(1))
             image_idx_val = int(meta.get("image_index", -1))
 
             sources.append({
@@ -686,11 +827,39 @@ Knowledge Base Context (Curriculum Materials):
                 "image_index": image_idx_val if image_idx_val >= 0 else None,
                 "content_type": meta.get("content_type", "unknown"),
                 "snippet": _build_relevant_snippet(chunk),
+                "y_offset": float(meta.get("y_offset", 0.0)),
             })
 
         return {"answer": answer, "sources": sources}
 
     # ─── Private helpers ───────────────────────────────────────────────────────
+
+    def _find_y_offset(self, chunk: str, unit: dict) -> float:
+        """
+        Estimate the normalized Y position (0.0–1.0) of a chunk within its PDF page.
+        Uses word-overlap matching between the chunk's opening words and the
+        pre-extracted text block positions stored in the unit.
+        """
+        blocks: list[tuple[float, str]] = unit.get("text_blocks_pos", [])
+        if not blocks:
+            return 0.0
+
+        # Use first 200 chars of the chunk (skip synthetic headers)
+        chunk_head = re.sub(r"^\[(Source|Classification):[^\]]+\]\s*", "", chunk[:200], flags=re.IGNORECASE)
+        chunk_words = set(re.findall(r"[a-z0-9']{3,}", chunk_head.lower()))
+        if not chunk_words:
+            return 0.0
+
+        best_y = 0.0
+        best_score = 0
+        for y_norm, blk_text in blocks:
+            blk_words = set(re.findall(r"[a-z0-9']{3,}", blk_text.lower()))
+            score = len(chunk_words & blk_words)
+            if score > best_score:
+                best_score = score
+                best_y = y_norm
+
+        return round(best_y, 4) if best_score >= 2 else 0.0
 
     def _chunk_text(self, text: str, min_len: int = 50) -> list[str]:
         """Split text into overlapping chunks with a minimum size threshold."""

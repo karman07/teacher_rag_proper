@@ -21,8 +21,10 @@ def parse_document(file_path: str) -> str:
 
     if ext == ".pdf":
         return _parse_pdf(file_path)
-    elif ext in (".png", ".jpg", ".jpeg"):
+    elif ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"):
         return f"[IMAGE_FILE:{path.name}]" # Placeholder, RAGEngine will handle visual description
+    elif ext in (".mp4", ".mov", ".avi", ".mkv", ".webm"):
+        return f"[VIDEO_FILE:{path.name}]" # Placeholder, RAGEngine will handle video description
     elif ext in (".docx",):
         return _parse_docx(file_path)
     elif ext in (".pptx",):
