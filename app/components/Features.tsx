@@ -21,41 +21,41 @@ type Feature = {
 const FEATURES: Feature[] = [
   {
     icon: Database,
-    title: 'Multi-Source Ingestion',
+    title: 'All Your Course Content, Unified',
     description:
-      'Connect Google Drive, AWS S3, Dropbox, Notion, OneDrive, and more. Supports PDFs, videos, slides, and any document format.',
+      'Bring together PDFs, notes, slides, and docs in one place from Google Drive, Notion, and more.',
     iconBg: 'bg-blue-50 dark:bg-blue-900/20',
     iconColor: 'text-blue-600 dark:text-blue-400',
   },
   {
     icon: Brain,
-    title: 'Intelligent RAG Pipeline',
+    title: 'AI Answers Student Questions Instantly',
     description:
-      'Production-grade retrieval-augmented generation built on your course materials. Accurate, cited, and grounded in your content.',
+      'Students get accurate answers 24/7 based only on your approved materials. Zero hallucinations.',
     iconBg: 'bg-violet-50 dark:bg-violet-900/20',
     iconColor: 'text-violet-600 dark:text-violet-400',
   },
   {
     icon: BarChart3,
-    title: 'Critical Analytics',
+    title: 'Understand Where Students Struggle',
     description:
-      'Track engagement, pinpoint knowledge gaps, measure comprehension trends, and get weekly AI-generated teaching recommendations.',
+      'Get insights into what topics students are confused about and track comprehension trends across the class.',
     iconBg: 'bg-cyan-50 dark:bg-cyan-900/20',
     iconColor: 'text-cyan-600 dark:text-cyan-400',
   },
   {
     icon: MessageSquare,
-    title: 'Smart Student Q&A',
+    title: 'Focus on Teaching, Not Repetition',
     description:
-      'Students ask questions 24/7. AI answers directly from your curated knowledge base — with source citations for transparency.',
+      'Eliminate repetitive emails and forum posts. Let AI handle the basic questions while you focus on high-impact teaching.',
     iconBg: 'bg-violet-50 dark:bg-violet-900/20',
     iconColor: 'text-violet-600 dark:text-violet-400',
   },
   {
     icon: Zap,
-    title: 'Real-Time Ingestion',
+    title: 'Always Up-to-Date',
     description:
-      'Documents are ingested, parsed, and vectorized immediately upon upload. Your knowledge base maintains constant alignment with your latest curriculum changes.',
+      'Any new material you upload is instantly available to students. No manual syncing required.',
     iconBg: 'bg-amber-50 dark:bg-amber-900/20',
     iconColor: 'text-amber-600 dark:text-amber-400',
   },
@@ -71,15 +71,15 @@ const FEATURES: Feature[] = [
     icon: Globe,
     title: 'Global Language Capability',
     description:
-      "Support students across multiple global languages. The system intelligently detects and responds in the student's native language context.",
+      "Support international students. The system intelligently detects and responds in the student's native language context.",
     iconBg: 'bg-blue-50 dark:bg-blue-900/20',
     iconColor: 'text-blue-600 dark:text-blue-400',
   },
   {
     icon: RefreshCw,
-    title: 'Auto-Sync & Updates',
+    title: 'Seamless Integrations',
     description:
-      'Changes in your Drive or S3 are automatically reflected — no manual uploads required.',
+      'Works seamlessly with your existing tools, including Google Drive, AWS S3, Dropbox, and major LMS platforms.',
     iconBg: 'bg-violet-50 dark:bg-violet-900/20',
     iconColor: 'text-violet-600 dark:text-violet-400',
   },
@@ -109,11 +109,11 @@ export default function Features() {
             badge="Everything You Need"
             title={
               <>
-                Built for Academic{' '}
-                <span className="gradient-text">Excellence</span>
+                Everything You Need to{' '}
+                <span className="gradient-text">Teach Better</span>
               </>
             }
-            subtitle="From high-fidelity data ingestion to architectural grounding—Multimodal Teacher manages the entire intelligence pipeline."
+            subtitle="A complete AI teaching assistant designed to save you time and help your students succeed."
           />
         </motion.div>
 

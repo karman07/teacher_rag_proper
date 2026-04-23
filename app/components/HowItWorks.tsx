@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Card, CardBody, Chip } from '@heroui/react';
-import { Upload, Cpu, TrendingUp, ArrowRight } from 'lucide-react';
+import { Upload, Brain, MessageSquare, TrendingUp, ArrowRight } from 'lucide-react';
 import SectionHeader from './common/SectionHeader';
 import Container from './common/Container';
 import { COLORS } from '../constants/colors';
@@ -11,23 +11,30 @@ const STEPS = [
   {
     step: '01',
     icon: Upload,
-    title: 'Curricular Data Ingestion',
-    description: 'Our system ingests raw pedagogical assets—lecture notes, textbooks, research papers, and slide decks—converting them into structured data formats suitable for high-dimensional analysis.',
-    tags: ['PDF Parsing', 'OCR Processing', 'Multi-modal Ingestion', 'Semantic Cleanup'],
+    title: 'Upload Your Materials',
+    description: 'Simply drag and drop your lecture notes, slides, and syllabus, or connect directly to Google Drive.',
+    tags: ['PDFs & Docs', 'Slides', 'Google Drive', 'Auto-Sync'],
   },
   {
     step: '02',
-    icon: Cpu,
-    title: 'Cognitive Vector Indexing',
-    description: 'Utilizing state-of-the-art embedding models, we map your curriculum into a dense vector space. This allows for semantic retrieval that understands context beyond simple keyword matching.',
-    tags: ['Vector Embeddings', 'Knowledge Graphing', 'RAG Optimization', 'Latency Reduction'],
+    icon: Brain,
+    title: 'AI Learns Your Curriculum',
+    description: 'Our system instantly processes your materials to build a deep, contextual understanding of your course.',
+    tags: ['Instant Setup', 'Zero Maintenance', 'Secure Data'],
   },
   {
     step: '03',
+    icon: MessageSquare,
+    title: 'Students Ask Questions',
+    description: 'Students get 24/7 support with accurate answers based strictly on the materials you provided.',
+    tags: ['24/7 Support', 'Cited Sources', 'No Hallucinations'],
+  },
+  {
+    step: '04',
     icon: TrendingUp,
-    title: 'Research-Driven Inference',
-    description: 'The final layer delivers deterministic answers with architectural grounding. Every response is cross-referenced against the internal knowledge base, ensuring zero-hallucination accuracy.',
-    tags: ['Deterministic Q&A', 'Citation Mapping', 'Pedagogical Alignment', 'Interaction Logs'],
+    title: 'You Get Insights',
+    description: 'Monitor what topics students are struggling with and adjust your teaching strategy accordingly.',
+    tags: ['Knowledge Gaps', 'Engagement Stats', 'Weekly Reports'],
   },
 ];
 
@@ -42,13 +49,13 @@ export default function HowItWorks() {
           transition={{ duration: 0.6 }}
         >
           <SectionHeader
-            badge="Architecture"
-            title={<>The Science of <span style={{ color: COLORS.primary[600] }}>Deterministic AI</span></>}
-            subtitle="We are pioneering a multi-modal RAG framework designed specifically for the rigors of academic instruction and student support."
+            badge="How It Works"
+            title={<>Four Steps to a <span style={{ color: COLORS.primary[600] }}>Smarter Classroom</span></>}
+            subtitle="Setup takes less than 5 minutes. No technical expertise required."
           />
         </motion.div>
 
-        <div className="grid lg:grid-cols-3 gap-8 lg:gap-6">
+        <div className="grid lg:grid-cols-4 gap-8 lg:gap-6">
           {STEPS.map((step, i) => {
             const Icon = step.icon;
             return (

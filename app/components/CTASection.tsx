@@ -26,18 +26,17 @@ export default function CTASection() {
           <div className="relative">
             <div className="flex justify-center mb-6">
               <SectionBadge live className="border-white/30 bg-white/10">
-                <span className="text-white">A Research Project</span>
+                <span className="text-white">Ready to Start?</span>
               </SectionBadge>
             </div>
 
             <h2 className="text-4xl lg:text-5xl font-bold text-white mb-5 leading-tight max-w-2xl mx-auto">
-              Participate in the
+              Transform Your Classroom
               <br />
-              Research Study
+              Today
             </h2>
             <p className="text-blue-100 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-              Explore the boundaries of Multi-modal RAG with our Principal Advisor
-              and the NVIDIA research collaboration network.
+              Join leading educators and institutions using AI to save time, engage students, and deliver better outcomes.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -49,7 +48,7 @@ export default function CTASection() {
                 endContent={<ArrowRight size={18} />}
                 className="bg-white text-blue-700 font-bold px-10 h-14 rounded-2xl shadow-xl hover:bg-blue-50 transition-colors"
               >
-                Access Platform
+                Start for Free
               </Button>
             </div>
           </div>

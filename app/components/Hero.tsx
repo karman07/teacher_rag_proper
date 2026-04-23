@@ -12,10 +12,9 @@ import { useAuth } from '../context/AuthContext';
 
 /* --- Typewriter hook --- */
 const TYPEWRITER_WORDS = [
-  "AI Knowledge Bases",
-  "Smart RAG Analytics",
-  "Critical Insights",
-  "Data-Driven Teaching",
+  "Actionable Teaching Insights",
+  "24/7 Academic Support",
+  "Engaged Classrooms",
 ];
 
 function useTypewriter(words: string[], speed = 75, pause = 2200) {
@@ -160,7 +159,7 @@ function ResearchCollaboratorMockup() {
         <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
           <span className="text-[10px] font-black text-slate-800 dark:text-blue-100 uppercase tracking-[0.2em] whitespace-nowrap">
-            Deterministic Engine
+            AI Teaching Assistant
           </span>
         </div>
       </div>
@@ -216,9 +215,8 @@ export default function Hero() {
 
             {/* Sub-headline */}
             <p className="text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-[520px]">
-              Upload your teaching materials from Google Drive, S3, or anywhere.
-              Multimodal Teacher builds intelligent RAG systems and delivers analytics that
-              transform how you teach.
+              Upload your course materials and let AI answer student questions,
+              highlight knowledge gaps, and save you hours every week.
             </p>
 
             {/* CTAs */}
@@ -232,7 +230,16 @@ export default function Hero() {
                 className="font-bold px-10 h-14 rounded-2xl shadow-xl shadow-primary-500/20 hover:shadow-primary-500/40 hover:-translate-y-0.5 transition-all text-white"
                 style={{ backgroundColor: COLORS.primary[600] }}
               >
-                {user ? "Go to Dashboard" : "Start for Free"}
+                {user ? "Go to Dashboard" : "Start Free"}
+              </Button>
+              <Button
+                as={Link}
+                href="/demo"
+                size="lg"
+                variant="bordered"
+                className="font-bold px-10 h-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-slate-900 dark:text-white"
+              >
+                Book a Demo
               </Button>
             </div>
           </motion.div>

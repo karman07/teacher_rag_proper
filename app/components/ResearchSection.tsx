@@ -12,9 +12,9 @@ export default function ResearchSection() {
     <section id="research" className="py-24 bg-slate-50/50 dark:bg-[#080f1e]/50 border-y border-slate-100 dark:border-slate-800">
       <Container>
         <SectionHeader 
-          badge="Academic Research"
+          badge="Built on Academic Excellence"
           title={<>Sponsored by <span style={{ color: '#76B900' }}>NVIDIA</span> — Shaping Future Pedagogy</>}
-          subtitle="This platform is a high-precision Retrieval-Augmented Generation (RAG) research project dedicated to automating curriculum intelligence."
+          subtitle="Our core engine is built on cutting-edge research, ensuring the highest standards of accuracy and reliability for your classroom."
         />
 
         <div className="grid lg:grid-cols-[1fr_400px] gap-12 mt-16 items-start">
@@ -28,10 +28,9 @@ export default function ResearchSection() {
                 <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6 transition-transform group-hover:rotate-6">
                   <Microscope size={28} />
                 </div>
-                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">Research Objective</h3>
+                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">Zero Hallucinations</h3>
                 <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
-                  Exploring the boundaries of deterministic AI in education, ensuring that students receive 
-                  replies that are strictly grounded in verified classroom materials with precise citation mapping.
+                  We guarantee that students only receive answers based on the materials you upload. Every response includes precise citations back to your original documents.
                 </p>
               </motion.div>
 
@@ -44,8 +43,7 @@ export default function ResearchSection() {
                 </div>
                 <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">NVIDIA Partnership</h3>
                 <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
-                  Optimized for NVIDIA Tensor Core architectures, our inference engine handles complex multi-modal 
-                  pedagogical queries, establishing a benchmark for real-time academic assistant performance.
+                  Powered by NVIDIA's latest AI infrastructure, ensuring lightning-fast responses and the capability to process complex materials like recorded lectures and massive textbooks.
                 </p>
               </motion.div>
             </div>
@@ -55,26 +53,26 @@ export default function ResearchSection() {
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-4">
                   <Award className="text-blue-400" size={24} />
-                  <p className="label-caps !text-blue-400">Technical Methodology</p>
+                  <p className="label-caps !text-blue-400">Security & Reliability</p>
                 </div>
-                <h3 className="text-2xl font-black mb-6">Automated Curriculum Intelligence</h3>
+                <h3 className="text-2xl font-black mb-6">Built for Educational Institutions</h3>
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-blue-400 font-bold mb-2">1. Secure Knowledge Injection</h4>
+                    <h4 className="text-blue-400 font-bold mb-2">1. Absolute Data Isolation</h4>
                     <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                      Primary source materials are ingested into a localized vector store. Each document is cryptographically paired with its respective classroom, ensuring absolute data isolation and curricular integrity.
+                      Your materials are securely isolated per classroom. We never use your course content to train external public models.
                     </p>
                   </div>
                   <div>
-                    <h4 className="text-blue-400 font-bold mb-2">2. Grounded Inference Protocol</h4>
+                    <h4 className="text-blue-400 font-bold mb-2">2. Strict Material Adherence</h4>
                     <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                      Student queries trigger a two-phase retrieval process. The system identifies pedagogical context from the primary data before synthesizing a response, eliminating the risk of external hallucinations.
+                      The AI is constrained to act solely as a teaching assistant based on your provided context, completely eliminating the risk of unverified external information.
                     </p>
                   </div>
                   <div>
-                    <h4 className="text-blue-400 font-bold mb-2">3. Deterministic Validation</h4>
+                    <h4 className="text-blue-400 font-bold mb-2">3. Transparent Verification</h4>
                     <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                      Every statement generated by the system is linked to a specific coordinates within the source PDFs. This allows for immediate verification of academic claims by both the student and the instructor.
+                      Every generated statement links back to a specific page or slide in your materials, making it easy for you and your students to verify the information.
                     </p>
                   </div>
                 </div>
