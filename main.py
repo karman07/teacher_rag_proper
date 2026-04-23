@@ -94,6 +94,10 @@ class SourceDoc(BaseModel):
     image_index: Optional[int] = None
     content_type: Optional[str] = None
     snippet: Optional[str] = None
+    highlight_text: Optional[str] = None
+    highlight_start: Optional[int] = None
+    highlight_end: Optional[int] = None
+    y_offset: Optional[float] = None
 
 
 class QueryResponse(BaseModel):

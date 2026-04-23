@@ -11,6 +11,7 @@ Architecture:
 import os
 import io
 import re
+import json
 import asyncio
 import base64
 import hashlib
@@ -671,14 +672,31 @@ class RAGEngine:
                 "sources": [],
             }
 
+        retrieved_chunks = []
+        for i, (chunk, meta, dist) in enumerate(zip(chunks, metadatas, distances), start=1):
+            chunk_idx = int(meta.get("chunk_idx", -1))
+            retrieved_chunks.append({
+                "source_index": i,
+                "chunk": chunk,
+                "distance": float(dist),
+                "file_id": meta.get("file_id", ""),
+                "file_name": meta.get("file_name", "unknown"),
+                "chunk_idx": chunk_idx,
+                "page": int(meta.get("page", -1)),
+                "image_index": int(meta.get("image_index", -1)),
+                "content_type": meta.get("content_type", "unknown"),
+                "y_offset": float(meta.get("y_offset", 0.0)),
+            })
+
         # 4. Build context string
         context_parts = []
         is_assignment_mode = False
-        for i, (chunk, meta) in enumerate(zip(chunks, metadatas)):
+        for item in retrieved_chunks:
+            meta = metadatas[item["source_index"] - 1]
             if str(meta.get("is_assignment", "")).lower() == "true":
                 is_assignment_mode = True
             context_parts.append(
-                f"[Source {i+1}: {meta.get('file_name', 'unknown')} | chunk {meta.get('chunk_idx', '?')}]\n{chunk}"
+                f"[Source {item['source_index']}: {item['file_name']} | chunk {item['chunk_idx']}]\n{item['chunk']}"
             )
         context = "\n\n---\n\n".join(context_parts)
 
@@ -737,6 +755,20 @@ Recent Conversation History:
 
 Knowledge Base Context (Curriculum Materials):
 {context}
+
+Return STRICT JSON only with this schema:
+{{
+    "answer": "string",
+    "citations": [
+        {{ "source": 1, "quote": "exact quote copied from that source chunk" }}
+    ]
+}}
+
+Rules:
+- `source` must be the numeric source index shown above.
+- `quote` must be copied verbatim from that source chunk text.
+- Include 1-4 citations only for evidence actually used in the answer.
+- Do not wrap JSON in markdown.
 """
         prompt_parts = [system_prompt]
         
@@ -762,7 +794,71 @@ Knowledge Base Context (Curriculum Materials):
 
         # 6. Generate answer (offloaded to thread pool — non-blocking)
         response = await asyncio.to_thread(self._gen_model.generate_content, prompt_parts)
-        answer = response.text.strip()
+        raw_response = (response.text or "").strip()
+
+        def _extract_json_payload(text: str) -> Optional[dict]:
+            if not text:
+                return None
+
+            cleaned = text.strip()
+            if cleaned.startswith("```"):
+                cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+                cleaned = re.sub(r"\s*```$", "", cleaned)
+
+            try:
+                payload = json.loads(cleaned)
+                return payload if isinstance(payload, dict) else None
+            except Exception:
+                pass
+
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start < 0 or end <= start:
+                return None
+
+            try:
+                payload = json.loads(cleaned[start:end + 1])
+                return payload if isinstance(payload, dict) else None
+            except Exception:
+                return None
+
+        payload = _extract_json_payload(raw_response)
+        answer = raw_response
+        model_citations = []
+
+        if payload:
+            parsed_answer = payload.get("answer")
+            if isinstance(parsed_answer, str) and parsed_answer.strip():
+                answer = parsed_answer.strip()
+
+            parsed_citations = payload.get("citations")
+            if isinstance(parsed_citations, list):
+                model_citations = parsed_citations
+
+        citation_lookup = {}
+        for citation in model_citations:
+            if not isinstance(citation, dict):
+                continue
+
+            quote = str(citation.get("quote") or "").strip()
+            if not quote:
+                continue
+
+            source_number = citation.get("source")
+            source_idx = None
+            if isinstance(source_number, int):
+                source_idx = source_number
+            elif isinstance(source_number, str) and source_number.strip().isdigit():
+                source_idx = int(source_number.strip())
+
+            if source_idx is None or source_idx < 1 or source_idx > len(retrieved_chunks):
+                continue
+
+            src = retrieved_chunks[source_idx - 1]
+            ref_key = (src["file_id"], src["chunk_idx"])
+            existing_quote = citation_lookup.get(ref_key)
+            if existing_quote is None or len(quote) > len(existing_quote):
+                citation_lookup[ref_key] = quote
 
         # 7. Build source list with chunk-level references for frontend citations.
         question_terms = set(re.findall(r"[a-z0-9]{4,}", effective_question.lower()))
@@ -798,36 +894,78 @@ Knowledge Base Context (Curriculum Materials):
 
             return snippet[:280]
 
+        def _find_quote_span(chunk_text: str, quote: str) -> tuple[Optional[int], Optional[int], Optional[str]]:
+            if not quote:
+                return None, None, None
+
+            candidate = quote.strip().strip('"').strip("'")
+            if not candidate:
+                return None, None, None
+
+            pos = chunk_text.find(candidate)
+            if pos >= 0:
+                end = pos + len(candidate)
+                return pos, end, chunk_text[pos:end]
+
+            lower_chunk = chunk_text.lower()
+            lower_candidate = candidate.lower()
+            pos = lower_chunk.find(lower_candidate)
+            if pos >= 0:
+                end = pos + len(candidate)
+                return pos, end, chunk_text[pos:end]
+
+            return None, None, None
+
         seen_refs = set()
         sources = []
-        for chunk, meta, dist in zip(chunks, metadatas, distances):
-            fid = meta.get("file_id", "")
-            chunk_idx = int(meta.get("chunk_idx", -1))
+        for item in retrieved_chunks:
+            chunk = item["chunk"]
+            fid = item["file_id"]
+            chunk_idx = item["chunk_idx"]
             ref_key = (fid, chunk_idx)
             if ref_key in seen_refs:
                 continue
 
             seen_refs.add(ref_key)
 
-            page_val = int(meta.get("page", -1))
+            page_val = item["page"]
             # Fallback: extract page from embedded chunk header for old data that lacks page metadata
             # Every chunk starts with "[Classification: Text | Page N]" so this always works
             if page_val < 0 and chunk:
                 _pm = re.search(r'\[Classification:[^\]]*\bPage\s+(\d+)\b', chunk, re.IGNORECASE)
                 if _pm:
                     page_val = int(_pm.group(1))
-            image_idx_val = int(meta.get("image_index", -1))
+            image_idx_val = item["image_index"]
+            snippet = _build_relevant_snippet(chunk)
+
+            highlight_text = None
+            highlight_start = None
+            highlight_end = None
+
+            citation_quote = citation_lookup.get(ref_key)
+            if citation_quote:
+                start, end, exact_text = _find_quote_span(chunk, citation_quote)
+                if exact_text:
+                    highlight_text = exact_text
+                    highlight_start = start
+                    highlight_end = end
+                    snippet = exact_text
+                else:
+                    highlight_text = citation_quote
 
             sources.append({
                 "file_id": fid,
-                "file_name": meta.get("file_name", "unknown"),
-                "relevance": round(1 - float(dist), 3),
+                "file_name": item["file_name"],
+                "relevance": round(1 - item["distance"], 3),
                 "chunk_idx": chunk_idx if chunk_idx >= 0 else None,
                 "page": page_val if page_val >= 0 else None,
                 "image_index": image_idx_val if image_idx_val >= 0 else None,
-                "content_type": meta.get("content_type", "unknown"),
-                "snippet": _build_relevant_snippet(chunk),
-                "y_offset": float(meta.get("y_offset", 0.0)),
+                "content_type": item["content_type"],
+                "snippet": snippet,
+                "highlight_text": highlight_text,
+                "highlight_start": highlight_start,
+                "highlight_end": highlight_end,
+                "y_offset": item["y_offset"],
             })
 
         return {"answer": answer, "sources": sources}
