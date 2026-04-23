@@ -77,7 +77,7 @@ export default function StudentDashboard() {
               <GraduationCap size={22} strokeWidth={2.5} />
             </div>
             <span className="font-black text-xl tracking-tight text-slate-900">
-              Multimodal <span style={{ color: 'var(--primary)' }}>Student</span>
+              Study <span style={{ color: 'var(--primary)' }}>Assistant</span>
             </span>
           </div>
 

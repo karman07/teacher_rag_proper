@@ -10,7 +10,7 @@ const font = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Multimodal Student | Student Portal",
+  title: "AI Study Assistant | Student Portal",
   description: "Join your classroom and learn with AI assistance",
 };
 

@@ -1,0 +1,275 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@heroui/react";
+import { ArrowRight, Clock, CheckCircle2, FileText, Sparkles, Search, Bot, ArrowUpRight, UploadCloud } from "lucide-react";
+import Container from "../common/Container";
+import { useAuth } from "../../context/AuthContext";
+import { COLORS } from "../../constants/colors";
+
+/* --- Typewriter hook --- */
+const TYPEWRITER_WORDS = [
+  "Not Longer.",
+  "More Effectively.",
+  "With Instant Answers.",
+];
+
+function useTypewriter(words: string[], speed = 75, pause = 2200) {
+  const [displayText, setDisplayText] = useState("");
+  const [wordIndex, setWordIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentWord = words[wordIndex];
+    let timeout: ReturnType<typeof setTimeout>;
+
+    if (!isDeleting && displayText === currentWord) {
+      timeout = setTimeout(() => setIsDeleting(true), pause);
+    } else if (isDeleting && displayText === "") {
+      setIsDeleting(false);
+      setWordIndex((prev) => (prev + 1) % words.length);
+    } else {
+      timeout = setTimeout(
+        () =>
+          setDisplayText(
+            isDeleting
+              ? currentWord.slice(0, displayText.length - 1)
+              : currentWord.slice(0, displayText.length + 1)
+          ),
+        isDeleting ? speed / 2 : speed
+      );
+    }
+    return () => clearTimeout(timeout);
+  }, [displayText, isDeleting, wordIndex, words, speed, pause]);
+
+  return displayText;
+}
+
+/* ── Hero Mockup Animation ─────────────────────────────── */
+function HeroMockup() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => setStep(1), 800);
+    const timer2 = setTimeout(() => setStep(2), 2000);
+    const timer3 = setTimeout(() => setStep(3), 4000);
+    return () => { clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); };
+  }, []);
+
+  return (
+    <div className="relative group perspective-[2000px] animate-float" style={{ animationDelay: "0.2s" }}>
+      <div className="absolute -inset-4 bg-gradient-to-br from-blue-500/20 via-indigo-500/20 to-purple-500/20 rounded-[3rem] blur-2xl opacity-70 group-hover:opacity-100 transition duration-1000" />
+      
+      <motion.div 
+        initial={{ rotateX: 5, rotateY: -5 }}
+        animate={{ rotateX: 0, rotateY: 0 }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
+        className="relative rounded-[2.5rem] border border-white/40 dark:border-white/10 shadow-2xl overflow-hidden bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl flex flex-col transform-gpu"
+      >
+        {/* Browser Top Bar */}
+        <div className="h-14 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-6 bg-white/60 dark:bg-slate-900/60">
+          <div className="flex gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-400" />
+            <div className="w-3 h-3 rounded-full bg-amber-400" />
+            <div className="w-3 h-3 rounded-full bg-emerald-400" />
+          </div>
+          <div className="flex-1 px-4">
+            <div className="mx-auto max-w-[240px] h-7 bg-slate-100/80 dark:bg-slate-800/80 rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-500 border border-slate-200/60 dark:border-slate-700/60">
+              <Sparkles size={12} className="text-blue-500 mr-1.5" />
+              studyassistant.ai/session
+            </div>
+          </div>
+          <div className="w-16" /> {/* spacer */}
+        </div>
+
+        <div className="p-8 pb-0 flex-1 min-h-[420px] flex flex-col gap-6">
+          <AnimatePresence>
+            {step >= 1 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="flex justify-end"
+              >
+                <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-md max-w-[85%]">
+                  <p className="text-[14px] font-medium leading-relaxed">
+                    Can you summarize the main causes of the French Revolution from my notes?
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex gap-3 items-center"
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-blue-600">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                </div>
+                <p className="text-[12px] font-semibold text-slate-400 flex items-center gap-2">
+                  <Search size={12} /> Reading History_101_Notes.pdf...
+                </p>
+              </motion.div>
+            )}
+
+            {step >= 3 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-4 items-start"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shrink-0">
+                  <Bot size={20} />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-tl-sm p-5 shadow-sm">
+                    <p className="text-[14px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                      Based on your notes, the main causes were social inequality, unfair taxation on the Third Estate, and the financial crisis worsened by the king's spending.
+                    </p>
+                  </div>
+                  
+                  {/* Citation Chip */}
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="inline-flex items-center gap-3 bg-white dark:bg-slate-800 border border-blue-100 dark:border-blue-900 p-2.5 rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.08)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)] transition-all cursor-pointer"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 font-black text-[11px]">
+                      PDF
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-bold text-slate-900 dark:text-white leading-none mb-1">History_101_Notes.pdf</p>
+                      <p className="text-[10px] font-bold text-blue-600 leading-none flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Verified Source: Page 4
+                      </p>
+                    </div>
+                    <div className="ml-2 w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center text-slate-400">
+                      <ArrowUpRight size={14} />
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Input Mockup */}
+        <div className="p-6 pt-2 bg-gradient-to-t from-white via-white dark:from-slate-900 dark:via-slate-900 to-transparent">
+          <div className="h-14 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-2xl px-5 flex items-center gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <UploadCloud size={18} className="text-slate-400" />
+            <div className="flex-1 text-[13px] font-medium text-slate-400">Ask a follow up question...</div>
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+              <ArrowRight size={16} />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/* --- Main Hero section --- */
+export default function Hero() {
+  const { user } = useAuth();
+  const typewriterText = useTypewriter(TYPEWRITER_WORDS);
+
+  return (
+    <section className="relative min-h-[85vh] flex items-center overflow-hidden bg-white dark:bg-[#03070f] pt-8">
+      {/* Grid + glow backgrounds */}
+      <div className="absolute inset-0 grid-bg opacity-60 dark:opacity-100" />
+      <div className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full bg-blue-500/[0.04] dark:bg-blue-600/[0.08] blur-[120px] -translate-y-1/3 translate-x-1/3 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-blue-400/[0.04] dark:bg-blue-600/[0.06] blur-[100px] translate-y-1/3 -translate-x-1/3 pointer-events-none" />
+
+      <Container className="relative z-10 py-12 w-full">
+        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center">
+
+          {/* --- Left column --- */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            className="flex flex-col gap-8 max-w-[640px] min-w-0"
+          >
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-400 text-xs font-bold tracking-wide w-fit">
+              <Sparkles size={14} /> The #1 AI Study Tool for Students
+            </div>
+
+            {/* Headline */}
+            <div>
+              <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900 dark:text-white">
+                Study Smarter,
+              </h1>
+              {/* Typewriter line — fixed height prevents layout shift */}
+              <div className="mt-2 min-h-[4rem] lg:min-h-[5.5rem] relative flex items-start">
+                <div className="invisible h-0 font-bold text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] leading-[1.1] tracking-tight whitespace-nowrap pointer-events-none select-none">
+                  With Instant Answers.
+                </div>
+                
+                <h1
+                  className="absolute top-0 left-0 text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] font-bold leading-[1.1] tracking-tight text-blue-600 dark:text-blue-400 whitespace-nowrap"
+                >
+                  {typewriterText}
+                  <span className="inline-block w-[3px] h-9 lg:h-14 bg-blue-600 dark:bg-blue-400 ml-1 align-middle cursor-blink" />
+                </h1>
+              </div>
+            </div>
+
+            {/* Sub-headline */}
+            <p className="text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-[520px]">
+              Get instant answers from your own course materials—with sources you can trust. Upload your notes, PDFs, or textbooks. Ask questions anytime. Get clear answers backed by your actual study material.
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                as={Link}
+                href={user ? "/dashboard" : "/signup"}
+                color="primary"
+                size="lg"
+                endContent={<ArrowRight size={18} />}
+                className="font-bold px-10 h-14 rounded-2xl shadow-xl shadow-primary-500/20 hover:shadow-primary-500/40 hover:-translate-y-0.5 transition-all text-white"
+                style={{ backgroundColor: COLORS.primary[600] }}
+              >
+                {user ? "Go to Dashboard" : "Start Studying Smarter (Free)"}
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={12} strokeWidth={3} /></div>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Free to use</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400"><FileText size={12} strokeWidth={3} /></div>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Works with notes & PDFs</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400"><Clock size={12} strokeWidth={3} /></div>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Takes 2 mins to start</span>
+              </div>
+            </div>
+
+          </motion.div>
+
+          {/* --- Right column --- */}
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+            className="relative hidden lg:block"
+          >
+            <HeroMockup />
+          </motion.div>
+        </div>
+      </Container>
+    </section>
+  );
+}

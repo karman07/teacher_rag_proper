@@ -7,7 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
-export default function StudentSignup() {
+import React, { Suspense } from 'react';
+
+function SignupContent() {
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
@@ -157,5 +159,13 @@ export default function StudentSignup() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function StudentSignup() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <SignupContent />
+    </Suspense>
   );
 }

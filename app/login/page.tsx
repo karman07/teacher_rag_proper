@@ -7,7 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
-export default function StudentLogin() {
+import React, { Suspense } from 'react';
+
+function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -172,7 +174,7 @@ export default function StudentLogin() {
           </form>
 
           <p className="mt-8 text-center text-sm font-medium" style={{ color: "var(--muted)" }}>
-            New to Multimodal Student?{' '}
+            New to AI Study Assistant?{' '}
             <Link href="/signup" className="font-bold hover:underline" style={{ color: "var(--primary)" }}>
               Create account
             </Link>
@@ -189,5 +191,13 @@ export default function StudentLogin() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function StudentLogin() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
