@@ -14,7 +14,7 @@ const CARD_VARIANTS = {
 // All accent colors from COLORS constants — no gradients
 const ACCENT = [
   { iconColor: COLORS.primary[600] },             // blue
-  { iconColor: COLORS.accent.violet },             // violet
+  { iconColor: COLORS.accent.blue },             // blue shadow
   { iconColor: COLORS.accent.emerald },            // emerald
   { iconColor: COLORS.accent.amber },              // amber
 ];
@@ -96,7 +96,7 @@ export default function StatsCards({ stats, isLoading }: Props) {
       value: stats ? formatBytes(stats.totalSizeBytes) : '0 B',
       sub: 'Across all sources',
       icon: HardDrive,
-      accentColor: COLORS.accent.violet,
+      accentColor: COLORS.accent.blue,
     },
     {
       label: 'Ready for RAG',

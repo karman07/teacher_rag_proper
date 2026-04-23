@@ -22,8 +22,8 @@ interface Props {
   subjectId?: string;
 }
 
-const ALLOWED_EXT = '.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv';
-const ACCEPTED_LABELS = ['PDF', 'DOCX', 'PPTX', 'XLSX', 'TXT', 'MD', 'CSV'];
+const ALLOWED_EXT = '.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.aac,.m4a';
+const ACCEPTED_LABELS = ['PDF', 'DOCX', 'PPTX', 'XLSX', 'TXT', 'MD', 'CSV', 'IMG', 'VIDEO', 'AUDIO'];
 
 function getFileExt(name: string) {
   return name.split('.').pop()?.toUpperCase() ?? 'FILE';
@@ -122,7 +122,7 @@ export default function UploadDropzone({ onUploadComplete, subjectId }: Props) {
               {isDragging ? 'Release to upload' : 'Drop files here or click to browse'}
             </p>
             <p className="text-xs text-default-400 mb-3">
-              Max 50 MB per file
+              Max 1 GB per file
             </p>
             <div className="flex flex-wrap justify-center gap-1.5">
               {ACCEPTED_LABELS.map((ext) => (

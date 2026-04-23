@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar } from '@heroui/react';
 import {
   LayoutDashboard, FolderOpen, BarChart3, MessageCircle,
-  LogOut, Sun, Moon, Menu, X, Cpu, BookOpen
+  LogOut, Sun, Moon, Menu, X, Cpu, BookOpen, Users
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -19,6 +19,7 @@ const NAV = [
   { label: 'Dashboard',       href: '/dashboard',           icon: LayoutDashboard },
   { label: 'Subjects',        href: '/dashboard/subjects',  icon: BookOpen },
   { label: 'File Management', href: '/dashboard/files',     icon: FolderOpen },
+  { label: 'Students',        href: '/dashboard/students',  icon: Users },
   { label: 'Analytics',       href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Ask AI',          href: '/dashboard/chat',      icon: MessageCircle },
 ];
@@ -51,10 +52,10 @@ function SidebarContent({
           </div>
           <div>
             <p className="text-[13px] font-black tracking-tight" style={{ color: bodyText }}>
-              TeachAI
+              Multimodal Teacher
             </p>
             <p className="text-[10px]" style={{ color: mutedText }}>
-              Knowledge Platform
+              AI-Powered Assistant
             </p>
           </div>
         </div>
@@ -261,7 +262,7 @@ export default function DashboardLayout({ children }: Props) {
           >
             <Menu size={20} />
           </button>
-          <p className="text-[13px] font-black" style={{ color: 'var(--text)' }}>TeachAI</p>
+          <p className="text-[13px] font-black" style={{ color: 'var(--text)' }}>Multimodal Teacher</p>
         </div>
 
         {/* Page */}

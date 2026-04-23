@@ -36,7 +36,7 @@ export const COLORS = {
 
   // Semantic accent colors
   accent: {
-    violet:  '#7c3aed',
+    blue:    '#3b82f6',
     cyan:    '#06b6d4',
     amber:   '#f59e0b',
     emerald: '#10b981',

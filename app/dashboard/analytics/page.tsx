@@ -47,7 +47,7 @@ function MiniSparkline({ data, color }: { data: any[], color: string }) {
   );
 }
 
-function PremiumStatCard({ label, value, trend, icon: Icon, color, loading, sparkData }: any) {
+function PremiumStatCard({ label, value, trend, icon: Icon, color, loading, sparkData, inverseTrend }: any) {
   return (
     <Card className="border border-slate-200/50 dark:border-slate-800/50 shadow-sm bg-white dark:bg-slate-900/50 group overflow-hidden">
       <CardBody className="p-6">
@@ -73,10 +73,10 @@ function PremiumStatCard({ label, value, trend, icon: Icon, color, loading, spar
 
             {trend && (
               <div className="mt-4 flex items-center gap-1.5 border-t border-slate-50 dark:border-slate-800 pt-4">
-                <div className={`p-0.5 rounded-full ${trend > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                  <ArrowUpRight size={10} className={trend < 0 ? 'rotate-90' : ''} />
+                <div className={`p-0.5 rounded-full ${((inverseTrend ? -trend : trend) > 0) ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                  <ArrowUpRight size={10} className={(inverseTrend ? trend > 0 : trend < 0) ? 'rotate-90' : ''} />
                 </div>
-                <span className={`text-[10px] font-black ${trend > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <span className={`text-[10px] font-black ${((inverseTrend ? -trend : trend) > 0) ? 'text-emerald-500' : 'text-rose-500'}`}>
                   {Math.abs(trend)}% {trend > 0 ? 'increase' : 'decrease'}
                 </span>
                 <span className="text-[10px] font-bold text-slate-400 ml-auto">vs last period</span>
@@ -101,6 +101,9 @@ export default function AnalyticsPage() {
   const [topics,       setTopics]       = useState<TopicStat[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
+  const [isLive,       setIsLive]       = useState(false); // Live monitoring mode
+
+
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login');
@@ -130,6 +133,16 @@ export default function AnalyticsPage() {
   }, [selectedSubjectId]);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
+
+  // Polling for Live Mode
+  useEffect(() => {
+    if (!isLive) return;
+    const interval = setInterval(() => {
+      setRefreshing(true);
+      fetchAll();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isLive, fetchAll]);
 
   const chartData = summary?.last7Days.map(d => ({
     ...d,
@@ -171,6 +184,17 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Button 
+              size="sm" 
+              variant={isLive ? 'shadow' : 'bordered'} 
+              color={isLive ? 'danger' : 'default'}
+              onClick={() => setIsLive(!isLive)}
+              className="font-black text-[10px] uppercase tracking-widest h-10 px-6 rounded-2xl transition-all"
+            >
+              <div className={`w-2 h-2 rounded-full mr-1 ${isLive ? 'bg-white animate-ping' : 'bg-default-400'}`} />
+              {isLive ? 'Live Monitoring' : 'Go Live'}
+            </Button>
+
             <Button size="sm" variant="shadow" color="primary" onClick={() => fetchAll()} isLoading={refreshing}
               className="font-black text-[11px] uppercase tracking-widest h-10 px-6 rounded-2xl bg-gradient-to-tr from-blue-700 to-blue-500 shadow-blue-500/20">
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Sync Data
@@ -178,12 +202,15 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* -- Smart Insights Panel -- */}
+
+
         {/* -- Key Metrics Tier -- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          <PremiumStatCard label="AI Interactions" value={summary?.totalQueries ?? 0} trend={12} icon={MessageCircle} color="#2563eb" loading={loading} />
+          <PremiumStatCard label="AI Interactions" value={summary?.totalQueries ?? 0} trend={summary?.trends.queries} icon={MessageCircle} color="#2563eb" loading={loading} />
           <PremiumStatCard label="Page Views" value={summary?.engagement?.pageViews ?? 0} trend={24} icon={Eye} color="#0ea5e9" loading={loading} />
-          <PremiumStatCard label="Enrolled Students" value={summary?.engagement?.joined ?? 0} trend={5} icon={Users} color="#8b5cf6" loading={loading} />
-          <PremiumStatCard label="Avg Response" value={`${summary?.avgResponseMs ?? 0}ms`} trend={15} icon={Clock} color="#f59e0b" loading={loading} />
+          <PremiumStatCard label="Enrolled Students" value={summary?.engagement?.joined ?? 0} trend={summary?.trends.students ?? 0} icon={Users} color="#8b5cf6" loading={loading} />
+          <PremiumStatCard label="Avg Response" value={`${summary?.avgResponseMs ?? 0}ms`} trend={summary?.trends.avgResponse} icon={Clock} color="#f59e0b" loading={loading} inverseTrend />
         </div>
 
         {/* -- Primary Visualizations -- */}
@@ -293,7 +320,7 @@ export default function AnalyticsPage() {
                         dataKey="value"
                       >
                         <Cell fill="#2563eb" />
-                        <Cell fill="#8b5cf6" />
+                        <Cell fill="#60a5fa" />
                       </Pie>
                       <ReTooltip content={<CustomTooltip />} />
                     </PieChart>
@@ -307,7 +334,7 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-4 h-4 rounded-lg bg-violet-500" />
+                      <div className="w-4 h-4 rounded-lg bg-blue-400" />
                       <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Student</p>
                         <p className="text-lg font-black text-slate-900 dark:text-white">{summary.studentQueries}</p>
@@ -344,7 +371,7 @@ export default function AnalyticsPage() {
                         <tr key={q.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${q.askedBy === 'teacher' ? 'bg-blue-600' : 'bg-violet-500'}`} />
+                              <div className={`w-2 h-2 rounded-full ${q.askedBy === 'teacher' ? 'bg-blue-600' : 'bg-blue-300'}`} />
                               <span className="text-[11px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight">
                                 {q.askedBy === 'teacher' ? 'Teacher' : (q.student?.name ?? 'Student')}
                               </span>

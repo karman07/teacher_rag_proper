@@ -28,6 +28,11 @@ export interface AnalyticsSummary {
   teacherQueries: number;
   studentQueries: number;
   avgResponseMs:  number;
+  trends: {
+    queries: number;
+    avgResponse: number;
+    students?: number;
+  };
   last7Days:      DailyStat[];
   topFiles:       TopFile[];
   engagement: {
@@ -124,5 +129,17 @@ export const analyticsApi = {
       headers: authHeaders(),
       body: JSON.stringify(data),
     });
+  },
+  
+  getAllStudents: async (): Promise<any[]> => {
+    const res = await fetch(`${API}/analytics/students`, { headers: authHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch all students');
+    return res.json();
+  },
+
+  getStudentDetailAnalytics: async (studentId: string, timeframe = 'all'): Promise<any> => {
+    const res = await fetch(`${API}/analytics/student-detail/${studentId}?timeframe=${timeframe}`, { headers: authHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch student details');
+    return res.json();
   },
 };

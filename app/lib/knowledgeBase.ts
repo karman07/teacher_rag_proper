@@ -27,6 +27,7 @@ export interface KnowledgeFile {
   chunkCount: number;
   cloudFileId?: string;
   subjectId?: string | null;
+  isAssignment: boolean;
   createdAt: string;
 }
 
@@ -169,7 +170,7 @@ export const knowledgeBaseApi = {
 
   updateFileMeta: async (
     fileId: string,
-    data: { displayName?: string; tags?: string[]; subjectId?: string | null },
+    data: { displayName?: string; tags?: string[]; subjectId?: string | null; isAssignment?: boolean },
   ): Promise<KnowledgeFile> => {
     const res = await fetch(`${API}/knowledge-base/files/${fileId}`, {
       method: 'PATCH',

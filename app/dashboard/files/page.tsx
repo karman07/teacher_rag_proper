@@ -6,13 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Button, Input, Tooltip, Card, CardBody, Modal, ModalContent,
   ModalHeader, ModalBody, ModalFooter, useDisclosure,
-  Chip, Skeleton, Pagination, Select, SelectItem
+  Chip, Skeleton, Pagination, Select, SelectItem, Switch
 } from '@heroui/react';
 import {
   Search, Grid3x3, List, Trash2, MessageCircle, Pencil,
   Tag, FileText, BookOpen, FileSpreadsheet, Presentation,
-  CheckCircle2, Loader2, RefreshCw, AlertCircle, X,
-  FolderOpen, SortAsc, SortDesc, ChevronDown, BookOpen as SubjectIcon, Plus
+  CheckCircle2, Loader2, RefreshCw, AlertCircle, X, Video, Image as ImageIcon, Music,
+  FolderOpen, SortAsc, SortDesc, ChevronDown, BookOpen as SubjectIcon, Plus, Sparkles,
+  AlertTriangle, Info
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
@@ -34,6 +35,10 @@ const FILE_ICON: Record<string, React.ElementType> = {
   pdf: FileText, docx: BookOpen, doc: BookOpen,
   pptx: Presentation, xlsx: FileSpreadsheet, csv: FileSpreadsheet,
   txt: FileText, md: FileText,
+  png: ImageIcon, jpg: ImageIcon, jpeg: ImageIcon, webp: ImageIcon, gif: ImageIcon, 
+  bmp: ImageIcon, tif: ImageIcon, tiff: ImageIcon,
+  mp4: Video, mov: Video, avi: Video, mkv: Video, webm: Video,
+  mp3: Music, wav: Music, aac: Music, m4a: Music
 };
 const getIcon = (name: string): React.ElementType =>
   FILE_ICON[name.split('.').pop()?.toLowerCase() ?? ''] ?? FileText;
@@ -54,22 +59,86 @@ const SOURCE_LABEL: Record<string, string> = {
   notion: 'Notion', onedrive: 'OneDrive',
 };
 
+/* --- Delete Confirmation Modal -------------------------------------------- */
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, title, message, isLoading, errorMsg }: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  title: string;
+  message: string;
+  isLoading: boolean;
+  errorMsg: string | null;
+}) {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="sm" hideCloseButton>
+      <ModalContent className="rounded-[2.5rem] border border-divider shadow-2xl p-2">
+        <ModalBody className="p-6 text-center space-y-6">
+          <div className="mx-auto w-20 h-20 rounded-full bg-danger-50 flex items-center justify-center animate-pulse">
+            <AlertTriangle size={40} className="text-danger" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-foreground">{title}</h2>
+            <p className="text-sm font-medium text-default-500 px-4">{message}</p>
+          </div>
+          
+          {errorMsg && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-4 rounded-2xl bg-danger-50 border border-danger-100 flex items-start gap-3 text-left"
+            >
+              <Info size={16} className="text-danger shrink-0 mt-0.5" />
+              <p className="text-xs font-bold text-danger leading-relaxed">
+                <span className="uppercase text-[9px] block mb-0.5 opacity-60">System Error</span>
+                {errorMsg}
+              </p>
+            </motion.div>
+          )}
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Button 
+              color="danger" 
+              className="font-black text-sm h-12 rounded-2xl shadow-lg shadow-danger/20"
+              isLoading={isLoading}
+              onClick={onConfirm}
+            >
+              Yes, Delete Permanently
+            </Button>
+            <Button 
+              variant="light" 
+              className="font-bold text-xs text-default-400 hover:text-foreground h-10"
+              onClick={onClose}
+              isDisabled={isLoading}
+            >
+              Cancel, Keep it
+            </Button>
+          </div>
+        </ModalBody>
+      </ModalContent>
+    </Modal>
+  );
+}
+
 const PAGE_SIZE = 16;
 
 /* --- Edit modal ----------------------------------------------------------- */
 function EditModal({ file, subjects, onSave, onClose }: {
   file: KnowledgeFile;
   subjects: Subject[];
-  onSave: (id: string, displayName: string, tags: string[], subjectId: string | null) => Promise<void>;
+  onSave: (id: string, displayName: string, tags: string[], subjectId: string | null, isAssignment: boolean) => Promise<void>;
   onClose: () => void;
 }) {
   const [displayName, setDisplayName] = useState(file.displayName ?? file.originalName);
   const [subjectId,   setSubjectId]   = useState<string>(file.subjectId ?? 'all');
+  const [isAssignment, setIsAssignment] = useState(file.isAssignment ?? false);
   const [tagInput,    setTagInput]    = useState('');
   const [tags,        setTags]        = useState<string[]>(file.tags ?? []);
   const [saving,      setSaving]      = useState(false);
 
+  const [errorMsg,   setErrorMsg]    = useState<string | null>(null);
+
   const addTag = () => {
+    setErrorMsg(null);
     const t = tagInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
     if (t && !tags.includes(t) && tags.length < 10) { setTags([...tags, t]); setTagInput(''); }
   };
@@ -78,23 +147,33 @@ function EditModal({ file, subjects, onSave, onClose }: {
 
   const handleSave = async () => {
     setSaving(true);
+    setErrorMsg(null);
     try { 
       await onSave(
         file.id, 
         displayName.trim() || file.originalName, 
         tags, 
-        subjectId === 'all' ? null : subjectId
+        subjectId === 'all' ? null : subjectId,
+        isAssignment
       ); 
       onClose(); 
     }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { setErrorMsg(err.message || 'Failed to update file details.'); }
     finally { setSaving(false); }
   };
 
   return (
-    <ModalContent>
-      <ModalHeader className="text-sm font-bold">Edit File Details</ModalHeader>
-      <ModalBody className="py-4 space-y-4">
+    <ModalContent className="rounded-[2.5rem] border border-divider">
+      <ModalHeader className="px-6 pt-6">
+        <h2 className="text-xl font-black">Edit File Details</h2>
+      </ModalHeader>
+      <ModalBody className="p-6 space-y-4">
+        {errorMsg && (
+          <div className="p-3 rounded-2xl bg-danger-50 border border-danger-100 flex items-start gap-3">
+             <AlertTriangle size={16} className="text-danger mt-0.5 shrink-0" />
+             <p className="text-xs font-bold text-danger leading-tight">{errorMsg}</p>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-bold text-default-500 mb-1.5 uppercase tracking-wider">
             Display Name
@@ -125,6 +204,19 @@ function EditModal({ file, subjects, onSave, onClose }: {
               <SelectItem key={item.id} textValue={item.name}>{item.name}</SelectItem>
             )}
           </Select>
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-2xl border border-divider bg-default-50">
+          <div className="space-y-0.5">
+            <label className="text-xs font-bold text-foreground block">Mark as Assignment</label>
+            <p className="text-[10px] text-default-400">If enabled, RAG will only provide hints and guidance for this file.</p>
+          </div>
+          <Switch 
+            isSelected={isAssignment} 
+            onValueChange={setIsAssignment}
+            size="sm"
+            color="primary"
+          />
         </div>
 
         <div>
@@ -217,6 +309,11 @@ function FileRow({ file, isSelected, onToggle, onEdit, onDelete, onChat, deletin
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-sm font-semibold text-foreground truncate">{displayedName}</p>
+          {file.isAssignment && (
+            <div className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-wider flex items-center gap-1">
+              <Sparkles size={8} /> Assignment
+            </div>
+          )}
           {file.displayName && file.displayName !== file.originalName && (
             <span className="text-[10px] text-default-400 truncate hidden sm:inline">({file.originalName})</span>
           )}
@@ -295,6 +392,12 @@ function FilesPageContent() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
   const searchParams = useSearchParams();
   const { isOpen: isUploadOpen, onOpen: onUploadOpen, onClose: onUploadClose } = useDisclosure();
+  
+  // Delete Modal State
+  const { isOpen: isDelOpen, onOpen: onDelOpen, onClose: onDelClose } = useDisclosure();
+  const [delTarget, setDelTarget] = useState<{ id?: string, type: 'single' | 'bulk' } | null>(null);
+  const [delLoading, setDelLoading] = useState(false);
+  const [delError, setDelError] = useState<string | null>(null);
 
   // Chat state (router to /dashboard/chat?fileId=x)
   const openChat = (file: KnowledgeFile) => {
@@ -344,28 +447,45 @@ function FilesPageContent() {
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paginated  = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Remove this file from your knowledge base?')) return;
-    setDeletingId(id);
-    try { await knowledgeBaseApi.deleteFile(id); setFiles((p) => p.filter((f) => f.id !== id)); }
-    catch (e: any) { alert(e.message); }
-    finally { setDeletingId(null); }
+  const handleDeleteClick = (id: string) => {
+    setDelTarget({ id, type: 'single' });
+    setDelError(null);
+    onDelOpen();
   };
 
-  const handleSaveMeta = async (id: string, displayName: string, tags: string[], subjectId: string | null) => {
-    const updated = await knowledgeBaseApi.updateFileMeta(id, { displayName, tags, subjectId });
-    setFiles((p) => p.map((f) => f.id === id ? { ...f, ...updated } : f));
+  const handleBulkDeleteClick = () => {
+    setDelTarget({ type: 'bulk' });
+    setDelError(null);
+    onDelOpen();
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selectedIds.size} files permanently?`)) return;
-    setLoading(true);
+  const confirmDelete = async () => {
+    if (!delTarget) return;
+    setDelLoading(true);
+    setDelError(null);
     try {
-      await knowledgeBaseApi.batchDelete(Array.from(selectedIds));
-      setFiles((p) => p.filter((f) => !selectedIds.has(f.id)));
-      setSelectedIds(new Set());
-    } catch (e: any) { alert(e.message); }
-    finally { setLoading(false); }
+      if (delTarget.type === 'single' && delTarget.id) {
+        setDeletingId(delTarget.id);
+        await knowledgeBaseApi.deleteFile(delTarget.id);
+        setFiles((p) => p.filter((f) => f.id !== delTarget.id));
+      } else if (delTarget.type === 'bulk') {
+        await knowledgeBaseApi.batchDelete(Array.from(selectedIds));
+        setFiles((p) => p.filter((f) => !selectedIds.has(f.id)));
+        setSelectedIds(new Set());
+      }
+      onDelClose();
+      setDelTarget(null);
+    } catch (e: any) { 
+      setDelError(e.message || 'The system encountered an issue while removing the file. Please try again.');
+    } finally {
+      setDelLoading(false);
+      setDeletingId(null);
+    }
+  };
+
+  const handleSaveMeta = async (id: string, displayName: string, tags: string[], subjectId: string | null, isAssignment: boolean) => {
+    const updated = await knowledgeBaseApi.updateFileMeta(id, { displayName, tags, subjectId, isAssignment });
+    setFiles((p) => p.map((f) => f.id === id ? { ...f, ...updated } : f));
   };
 
   const handleBulkMove = async (sid: string) => {
@@ -375,9 +495,12 @@ function FilesPageContent() {
       await Promise.all(Array.from(selectedIds).map(id => 
         knowledgeBaseApi.updateFileMeta(id, { subjectId: targetSid })
       ));
-      fetchFiles();
       setSelectedIds(new Set());
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { 
+      setDelTarget({ type: 'bulk' });
+      setDelError(e.message || 'Bulk move failed.'); 
+      onDelOpen();
+    }
     finally { setLoading(false); }
   };
 
@@ -534,7 +657,7 @@ function FilesPageContent() {
                       isSelected={selectedIds.has(file.id)}
                       onToggle={() => toggleOne(file.id)}
                       onEdit={setEditFile}
-                      onDelete={handleDelete}
+                      onDelete={handleDeleteClick}
                       onChat={openChat}
                       deletingId={deletingId}
                     />
@@ -571,7 +694,7 @@ function FilesPageContent() {
                 size="sm" 
                 variant="light" 
                 className="text-background font-bold text-xs hover:bg-white/10"
-                onClick={handleBulkDelete}
+                onClick={handleBulkDeleteClick}
                 startContent={<Trash2 size={13} />}
               >
                 Delete
@@ -669,6 +792,19 @@ function FilesPageContent() {
           />
         </Modal>
       )}
+      {/* -- Delete Confirmation -- */}
+      <DeleteConfirmModal 
+        isOpen={isDelOpen}
+        onClose={onDelClose}
+        onConfirm={confirmDelete}
+        title={delTarget?.type === 'bulk' ? 'Delete Multiple Files' : 'Delete Document'}
+        message={delTarget?.type === 'bulk' 
+          ? `You are about to permanently remove ${selectedIds.size} selected files. This action cannot be undone.` 
+          : 'Are you sure you want to remove this document from your knowledge base? All associated chunks will be lost.'
+        }
+        isLoading={delLoading}
+        errorMsg={delError}
+      />
     </DashboardLayout>
   );
 }

@@ -11,23 +11,23 @@ const STEPS = [
   {
     step: '01',
     icon: Upload,
-    title: 'Connect Your Data Sources',
-    description: 'Link Google Drive, AWS S3, Notion, OneDrive, or upload files directly. TeachAI accepts every format — PDFs, slides, recordings, and more.',
-    tags: ['Google Drive', 'AWS S3', 'Notion', 'Dropbox', '+12 more'],
+    title: 'Curricular Data Ingestion',
+    description: 'Our system ingests raw pedagogical assets—lecture notes, textbooks, research papers, and slide decks—converting them into structured data formats suitable for high-dimensional analysis.',
+    tags: ['PDF Parsing', 'OCR Processing', 'Multi-modal Ingestion', 'Semantic Cleanup'],
   },
   {
     step: '02',
     icon: Cpu,
-    title: 'AI Builds Your Knowledge Base',
-    description: 'Our pipeline automatically chunks, embeds, and indexes your content into a high-performance vector store optimized for educational context.',
-    tags: ['Auto-chunking', 'Vector indexing', 'Citation mapping', 'Smart context'],
+    title: 'Cognitive Vector Indexing',
+    description: 'Utilizing state-of-the-art embedding models, we map your curriculum into a dense vector space. This allows for semantic retrieval that understands context beyond simple keyword matching.',
+    tags: ['Vector Embeddings', 'Knowledge Graphing', 'RAG Optimization', 'Latency Reduction'],
   },
   {
     step: '03',
     icon: TrendingUp,
-    title: 'Teach Smarter with Insights',
-    description: 'Students get instant, cited answers from your exact materials. You get deep analytics on engagement, gaps, and learning outcomes.',
-    tags: ['Real-time Q&A', 'Gap detection', 'Weekly reports', 'AI suggestions'],
+    title: 'Research-Driven Inference',
+    description: 'The final layer delivers deterministic answers with architectural grounding. Every response is cross-referenced against the internal knowledge base, ensuring zero-hallucination accuracy.',
+    tags: ['Deterministic Q&A', 'Citation Mapping', 'Pedagogical Alignment', 'Interaction Logs'],
   },
 ];
 
@@ -42,9 +42,9 @@ export default function HowItWorks() {
           transition={{ duration: 0.6 }}
         >
           <SectionHeader
-            badge="Simple Setup"
-            title={<>Up and Running in <span style={{ color: COLORS.primary[600] }}>Under 10 Minutes</span></>}
-            subtitle="No engineering team required. Connect your sources, let AI do the work, and start delivering smarter student experiences immediately."
+            badge="Architecture"
+            title={<>The Science of <span style={{ color: COLORS.primary[600] }}>Deterministic AI</span></>}
+            subtitle="We are pioneering a multi-modal RAG framework designed specifically for the rigors of academic instruction and student support."
           />
         </motion.div>
 

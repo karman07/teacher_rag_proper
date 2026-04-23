@@ -53,25 +53,25 @@ const FEATURES: Feature[] = [
   },
   {
     icon: Zap,
-    title: 'Real-Time Processing',
+    title: 'Real-Time Ingestion',
     description:
-      'Documents are ingested, chunked, and vectorized in minutes. Your knowledge base stays fresh with automatic re-sync.',
+      'Documents are ingested, parsed, and vectorized immediately upon upload. Your knowledge base maintains constant alignment with your latest curriculum changes.',
     iconBg: 'bg-amber-50 dark:bg-amber-900/20',
     iconColor: 'text-amber-600 dark:text-amber-400',
   },
   {
     icon: ShieldCheck,
-    title: 'Enterprise Security',
+    title: 'Institutional-Grade Security',
     description:
-      'End-to-end encryption, FERPA and GDPR compliance, role-based access control, and SOC 2 Type II certification.',
+      'End-to-end encryption, academic privacy compliance, role-based access control, and secure data isolation protocols.',
     iconBg: 'bg-emerald-50 dark:bg-emerald-900/20',
     iconColor: 'text-emerald-600 dark:text-emerald-400',
   },
   {
     icon: Globe,
-    title: 'Multi-Language Support',
+    title: 'Global Language Capability',
     description:
-      "Support students across 40+ languages. TeachAI auto-detects and responds in the student's native language.",
+      "Support students across multiple global languages. The system intelligently detects and responds in the student's native language context.",
     iconBg: 'bg-blue-50 dark:bg-blue-900/20',
     iconColor: 'text-blue-600 dark:text-blue-400',
   },
@@ -109,11 +109,11 @@ export default function Features() {
             badge="Everything You Need"
             title={
               <>
-                Built for Modern{' '}
-                <span className="gradient-text">Educators &amp; Institutions</span>
+                Built for Academic{' '}
+                <span className="gradient-text">Excellence</span>
               </>
             }
-            subtitle="From data ingestion to actionable insights — TeachAI handles the entire intelligence pipeline so you can focus on what matters most: teaching."
+            subtitle="From high-fidelity data ingestion to architectural grounding—Multimodal Teacher manages the entire intelligence pipeline."
           />
         </motion.div>
 

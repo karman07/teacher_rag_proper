@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardBody, Chip } from '@heroui/react';
-import { ChevronDown, FileText, Image as ImageIcon, Hash, Eye } from 'lucide-react';
+import { ChevronDown, FileText, Image as ImageIcon, Hash, Eye, Video } from 'lucide-react';
 import { RAGSource } from '../../lib/ragApi';
 
 function buildReferenceLabel(src: RAGSource): string[] {
@@ -17,6 +17,9 @@ function buildReferenceLabel(src: RAGSource): string[] {
 function SourceTypeIcon({ contentType }: { contentType?: string | null }) {
   if (contentType === 'pdf_image' || contentType === 'image') {
     return <ImageIcon size={10} />;
+  }
+  if (contentType === 'video') {
+    return <Video size={10} />;
   }
   return <FileText size={10} />;
 }

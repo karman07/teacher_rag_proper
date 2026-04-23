@@ -58,10 +58,10 @@ export default function AppNavbar() {
             </div>
             <div className="flex flex-col -gap-1">
               <p className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight flex items-baseline">
-                Teach<span className="text-primary-600 dark:text-primary-400 font-black">AI</span>
+                Multimodal <span className="text-primary-600 dark:text-primary-400 font-black ml-1">Teacher</span>
               </p>
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] leading-none">
-                Assistant
+                AI-Powered Assistant
               </span>
             </div>
           </Link>

@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
-import { ExternalLink, CheckCircle2, Loader2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { CheckCircle2 } from 'lucide-react';
 import { knowledgeBaseApi, KnowledgeFile } from '../../lib/knowledgeBase';
 import { COLORS } from '../../constants/colors';
 
@@ -49,7 +48,7 @@ const SOURCES = [
   {
     id: 'google_drive',
     name: 'Google Drive',
-    description: 'Import PDFs, Docs, Slides, and Sheets',
+    description: 'Import PDFs, Docs, Slides, Sheets, Images, and Videos',
     icon: <GoogleDriveIcon />,
     available: true,
     scope: 'https://www.googleapis.com/auth/drive.readonly',
@@ -92,73 +91,102 @@ declare global {
   }
 }
 
+// ── Helper: load a script once ────────────────────────────────────────────────
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+// ── Helper: get a FRESH Google OAuth2 token using Google Identity Services ────
+// This always prompts for consent / silently refreshes — no stale token issue.
+function getFreshDriveToken(clientId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: (response: any) => {
+        if (response.error) {
+          reject(new Error(`OAuth error: ${response.error} – ${response.error_description ?? ''}`));
+        } else {
+          // Cache it so same-session re-opens are instant
+          localStorage.setItem('teachai-google-token', response.access_token);
+          resolve(response.access_token);
+        }
+      },
+    });
+    tokenClient.requestAccessToken({ prompt: '' }); // '' = silent if already granted, popup otherwise
+  });
+}
+
 export default function SourceConnectors({ onImportComplete, subjectId }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
-  const { loginWithGoogle } = useAuth();
 
   const handleGoogleDrive = async () => {
     setLoading('google_drive');
     try {
-      // 1. Get the token from storage
-      let accessToken = localStorage.getItem('teachai-google-token');
-      
-      // 2. If no token (e.g. they use email/pwd), trigger Google login on the fly
-      if (!accessToken) {
-        console.log('No Google token found, triggering loginWithGoogle...');
-        await loginWithGoogle();
-        accessToken = localStorage.getItem('teachai-google-token');
-        if (!accessToken) throw new Error('Could not obtain Google access token. Please try again.');
-      }
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+      if (!clientId) throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set in .env');
 
-      // 3. Load GAPI if needed
-      if (!(window as any).gapi) {
-        await new Promise<void>((resolve) => {
-          const script = document.createElement('script');
-          script.src = 'https://apis.google.com/js/api.js';
-          script.onload = () => resolve();
-          document.head.appendChild(script);
-        });
-      }
+      // 1. Load both Google scripts in parallel
+      await Promise.all([
+        loadScript('https://apis.google.com/js/api.js'),
+        loadScript('https://accounts.google.com/gsi/client'),
+      ]);
 
-      // 4. Open the Picker
-      (window as any).gapi.load('picker', () => {
-        const picker = new (window as any).google.picker.PickerBuilder()
-          .addView((window as any).google.picker.ViewId.DOCS)
-          .setOAuthToken(accessToken!)
-          .enableFeature((window as any).google.picker.Feature.MULTISELECT_ENABLED)
-          .setCallback(async (data: any) => {
-            if (data.action === 'picked') {
-              const docs = data.docs;
-              console.log(`Picked ${docs.length} files from Drive`);
-              
-              for (const doc of docs) {
-                try {
-                  const result = await knowledgeBaseApi.importFromGoogleDrive({
-                    accessToken: accessToken!,
-                    fileId: doc.id,
-                    fileName: doc.name,
-                    mimeType: doc.mimeType,
-                    subjectId,
-                  });
-                  onImportComplete(result);
-                } catch (err: any) {
-                  console.error(`Import failed for ${doc.name}:`, err);
-                }
+      // 2. Initialize GAPI client (needed by Picker)
+      await new Promise<void>((res) => window.gapi.load('client:picker', () => res()));
+
+      // 3. Get a FRESH token via GIS — handles expiry automatically
+      const accessToken = await getFreshDriveToken(clientId);
+
+      // 4. Build and open the Picker
+      const origin = `${window.location.protocol}//${window.location.host}`;
+      const picker = new window.google.picker.PickerBuilder()
+        .addView(window.google.picker.ViewId.DOCS)
+        .setOAuthToken(accessToken)
+        .setAppId(process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.split(':')[1] || '')
+        .setOrigin(origin)
+        .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
+        .setCallback(async (data: any) => {
+          if (data.action === 'picked') {
+            const docs: any[] = data.docs;
+            console.log(`Picked ${docs.length} file(s) from Drive`);
+
+            for (const doc of docs) {
+              try {
+                const result = await knowledgeBaseApi.importFromGoogleDrive({
+                  accessToken,
+                  fileId: doc.id,
+                  fileName: doc.name,
+                  mimeType: doc.mimeType,
+                  subjectId,
+                });
+                onImportComplete(result);
+              } catch (err: any) {
+                console.error(`Import failed for "${doc.name}":`, err);
               }
-              
-              setSuccessId('google_drive');
-              setTimeout(() => setSuccessId(null), 3000);
             }
-            if (data.action === 'cancel' || data.action === 'picked') {
-              setLoading(null);
-            }
-          })
-          .build();
-        picker.setVisible(true);
-      });
+
+            setSuccessId('google_drive');
+            setTimeout(() => setSuccessId(null), 3000);
+          }
+          if (data.action === 'cancel' || data.action === 'picked') {
+            setLoading(null);
+          }
+        })
+        .build();
+
+      picker.setVisible(true);
     } catch (err: any) {
       console.error('Drive import error:', err);
+      alert(`Google Drive Error: ${err.message}`);
       setLoading(null);
     }
   };

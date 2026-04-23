@@ -90,177 +90,85 @@ const METRICS = [
 /* --- Product mockup --- */
 import { BookOpen } from "lucide-react";
 
-function ProductMockup() {
+function ResearchCollaboratorMockup() {
   return (
-    <div className="relative animate-float">
-      {/* Main card */}
-      <div className="glass-card rounded-2xl border border-slate-200/80 dark:border-blue-900/40 shadow-2xl shadow-blue-200/40 dark:shadow-blue-950/80 p-6 overflow-hidden">
-        {/* Gradient tint */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/[0.03] to-violet-600/[0.03] dark:from-blue-600/8 dark:to-violet-600/8 pointer-events-none rounded-2xl" />
+    <div className="relative animate-float group">
+      {/* Decorative glows */}
+      <div className="absolute -inset-4 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-[3rem] blur-2xl opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+      
+      {/* Glassmorphism Mockup Frame */}
+      <div className="relative rounded-[3rem] border border-slate-200/50 dark:border-white/10 shadow-2xl overflow-hidden bg-white/70 dark:bg-slate-900/80 backdrop-blur-3xl aspect-[1/1] flex flex-col p-8">
+         {/* Top Bar */}
+         <div className="flex items-center justify-between mb-8">
+            <div className="flex gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-400/30" />
+              <div className="w-3 h-3 rounded-full bg-amber-400/30" />
+              <div className="w-3 h-3 rounded-full bg-emerald-400/30" />
+            </div>
+            <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full w-32 border border-slate-200 dark:border-slate-700" />
+         </div>
 
-        {/* Window chrome */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-400/80" />
-            <div className="w-3 h-3 rounded-full bg-amber-400/80" />
-            <div className="w-3 h-3 rounded-full bg-emerald-400/80" />
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              teachai.app
-            </span>
-          </div>
-          <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
-        </div>
-
-        {/* Connected sources */}
-        <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">
-          Connected Sources
-        </p>
-        <div className="flex flex-wrap gap-3 mb-5">
-          {DATA_SOURCES.map((src) => (
-            <div
-              key={src.label}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white/40 dark:bg-white/5 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/40 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] transition-all hover:border-primary/50"
-              style={{ minWidth: 120 }}
-            >
-              <span className="flex items-center justify-center w-5 h-5 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
-                {src.icon}
-              </span>
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                {src.label}
-              </span>
-              <div className="ml-auto w-4 h-4 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <CheckCircle size={10} className="text-emerald-500" />
-              </div>
+         {/* Grid Body */}
+         <div className="flex-1 grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+               <div className="h-32 rounded-2xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100/50 dark:border-blue-800/30 p-4">
+                  <div className="w-full h-2 bg-blue-200/50 dark:bg-blue-700/50 rounded-full mb-3" />
+                  <div className="space-y-2">
+                    <div className="w-[80%] h-1.5 bg-slate-200/50 dark:bg-slate-700/50 rounded-full" />
+                    <div className="w-[90%] h-1.5 bg-slate-200/50 dark:bg-slate-700/50 rounded-full" />
+                    <div className="w-[60%] h-1.5 bg-slate-200/50 dark:bg-slate-700/50 rounded-full" />
+                  </div>
+               </div>
+               <div className="h-24 rounded-2xl bg-slate-50/50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-700/30 p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full" />
+                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/40" />
+                  </div>
+                  <div className="h-4 bg-slate-200/30 dark:bg-slate-700/30 rounded-lg w-full" />
+               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Chat messages */}
-        <div className="space-y-3 mb-5">
-          {/* User message */}
-          <div className="flex justify-end">
-            <div className="bg-blue-600 text-white text-xs rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[80%] leading-relaxed shadow-md shadow-blue-500/20">
-              Which topics are students struggling with?
+            <div className="h-full rounded-2xl bg-slate-900 border border-slate-700 p-4 flex flex-col relative overflow-hidden group">
+               {/* Vector Tree Mockup */}
+               <div className="absolute inset-x-0 top-0 bottom-0 pointer-events-none opacity-20">
+                  <div className="w-full h-full border border-blue-500/10 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+               </div>
+               <div className="relative z-10 flex flex-col items-center justify-center flex-1">
+                  <div className="w-16 h-16 rounded-full border border-blue-500/50 flex items-center justify-center mb-4 animate-pulse">
+                     <div className="w-8 h-8 rounded-full bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.5)]" />
+                  </div>
+                  <div className="space-y-2 w-full">
+                     <div className="h-1 bg-blue-500/30 rounded-full mx-auto w-1/2" />
+                     <div className="h-1 bg-blue-500/20 rounded-full mx-auto w-1/3" />
+                  </div>
+               </div>
+               {/* Metadata Chips */}
+               <div className="mt-auto space-y-2">
+                  <div className="flex gap-2">
+                    <div className="h-3 rounded-full bg-slate-800 border border-slate-700 w-12" />
+                    <div className="h-3 rounded-full bg-slate-800 border border-slate-700 w-8" />
+                  </div>
+               </div>
             </div>
-          </div>
-          {/* AI response */}
-          <div className="flex items-start gap-2">
-            <div 
-              className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
-              style={{ backgroundColor: COLORS.primary[600] }}
-            >
-              <span className="text-white text-[9px] font-bold">AI</span>
-            </div>
-            <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] leading-relaxed">
-              Based on{" "}
-              <span className="font-semibold text-slate-900 dark:text-white">
-                1,247 interactions
-              </span>
-              :{" "}
-              <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                Derivatives
-              </span>{" "}
-              (34%),{" "}
-              <span className="text-orange-500 dark:text-amber-400 font-semibold">
-                Linear Eqs.
-              </span>{" "}
-              (28%),{" "}
-              <span className="text-violet-600 dark:text-violet-400 font-semibold">
-                Integration
-              </span>{" "}
-              (19%)
-            </div>
-          </div>
-          {/* Typing indicator */}
-          <div className="flex items-start gap-2">
-            <div 
-              className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
-              style={{ backgroundColor: COLORS.primary[600] }}
-            >
-              <span className="text-white text-[9px] font-bold">AI</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tl-sm">
-              <div className="flex gap-0.5">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="w-1 h-3 bg-blue-500 rounded-full animate-pulse"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                Generating response…
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Metric bars */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2.5">
-          {METRICS.map((m) => (
-            <div key={m.label}>
-              <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1.5">
-                <span>{m.label}</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  {m.pct}%
-                </span>
-              </div>
-              <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${m.pct}%`, backgroundColor: COLORS.primary[600] }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+         </div>
       </div>
 
-      {/* Floating badge — top right */}
+      {/* Floating qualitative badge */}
       <div
-        className="absolute -top-5 -right-5 glass-card border border-slate-200/80 dark:border-blue-900/40 rounded-2xl px-4 py-3 shadow-xl animate-float"
+        className="absolute -top-6 -right-6 glass-card border border-white/40 dark:border-blue-900/40 rounded-2xl px-5 py-4 shadow-2xl backdrop-blur-xl animate-float"
         style={{ animationDelay: "1s" }}
       >
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-            RAG Active
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+          <span className="text-[10px] font-black text-slate-800 dark:text-blue-100 uppercase tracking-[0.2em] whitespace-nowrap">
+            Deterministic Engine
           </span>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-            94.2%
-          </span>{" "}
-          accuracy
-        </p>
-      </div>
-
-      {/* Floating badge — bottom left (improved) */}
-      <div
-        className="absolute -bottom-5 -left-5 glass-card border border-slate-200/80 dark:border-blue-900/40 rounded-2xl px-4 py-3 shadow-xl animate-float"
-        style={{ animationDelay: "2s" }}
-      >
-        <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-            <BookOpen size={18} className="text-blue-600 dark:text-blue-300" />
-          </span>
-          <div>
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-              2.4K Docs
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-              Processed today
-            </p>
-          </div>
         </div>
       </div>
     </div>
   );
 }
+
+
 
 /* --- Main Hero section --- */
 export default function Hero() {
@@ -268,13 +176,13 @@ export default function Hero() {
   const typewriterText = useTypewriter(TYPEWRITER_WORDS);
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden bg-white dark:bg-[#03070f] pt-16">
+    <section className="relative min-h-[85vh] flex items-center overflow-hidden bg-white dark:bg-[#03070f] pt-8">
       {/* Grid + glow backgrounds */}
       <div className="absolute inset-0 grid-bg opacity-60 dark:opacity-100" />
       <div className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full bg-blue-500/[0.04] dark:bg-blue-600/[0.08] blur-[120px] -translate-y-1/3 translate-x-1/3 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-blue-400/[0.04] dark:bg-blue-600/[0.06] blur-[100px] translate-y-1/3 -translate-x-1/3 pointer-events-none" />
 
-      <Container className="relative z-10 py-20 w-full">
+      <Container className="relative z-10 py-12 w-full">
         <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center">
 
           {/* --- Left column --- */}
@@ -284,14 +192,6 @@ export default function Hero() {
             transition={{ duration: 0.7, ease: "easeOut" }}
             className="flex flex-col gap-8 max-w-[640px] min-w-0"
           >
-            {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.5 }}
-            >
-              <SectionBadge live>AI-Powered Teaching Platform</SectionBadge>
-            </motion.div>
 
             {/* Headline */}
             <div>
@@ -317,7 +217,7 @@ export default function Hero() {
             {/* Sub-headline */}
             <p className="text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-[520px]">
               Upload your teaching materials from Google Drive, S3, or anywhere.
-              TeachAI builds intelligent RAG systems and delivers analytics that
+              Multimodal Teacher builds intelligent RAG systems and delivers analytics that
               transform how you teach.
             </p>
 
@@ -334,98 +234,18 @@ export default function Hero() {
               >
                 {user ? "Go to Dashboard" : "Start for Free"}
               </Button>
-
-              <Button
-                variant="bordered"
-                size="lg"
-                startContent={
-                  <span className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Play
-                      size={13}
-                      className="text-blue-600 dark:text-blue-400 ml-0.5"
-                      fill="currentColor"
-                    />
-                  </span>
-                }
-                className="border-2 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold px-8 h-14 rounded-2xl hover:border-primary-500/50 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all"
-              >
-                Watch Demo
-              </Button>
-            </div>
-
-            {/* Social proof */}
-            <div className="flex items-center gap-6 pt-2">
-              {/* Stacked avatars */}
-              <div className="flex -space-x-2.5">
-                {AVATAR_COLORS.map((color, i) => (
-                  <div
-                    key={i}
-                    className="w-9 h-9 rounded-full border-2 border-white dark:border-[#03070f] flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                  >
-                    {AVATAR_LETTERS[i]}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      size={14}
-                      className="text-amber-400"
-                      fill="#f59e0b"
-                    />
-                  ))}
-                  <span className="ml-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    4.9
-                  </span>
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                  Loved by{" "}
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    2,400+
-                  </span>{" "}
-                  educators
-                </p>
-              </div>
             </div>
           </motion.div>
 
-          {/* --- Right column — mockup --- */}
           <motion.div
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
             className="relative hidden lg:block"
           >
-            <ProductMockup />
+            <ResearchCollaboratorMockup />
           </motion.div>
         </div>
-
-        {/* --- Trusted-by strip --- */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="mt-24 pt-12 border-t border-slate-200 dark:border-slate-800"
-        >
-          <p className="text-center text-sm font-medium text-slate-400 dark:text-slate-500 mb-8 uppercase tracking-widest">
-            Trusted by educators at
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-10 lg:gap-16">
-            {["Stanford", "MIT", "Harvard", "Oxford", "Coursera", "Khan Academy"].map(
-              (name) => (
-                <span
-                  key={name}
-                  className="text-xl font-bold text-slate-300 dark:text-slate-700 hover:text-slate-400 dark:hover:text-slate-500 transition-colors cursor-default select-none tracking-tight"
-                >
-                  {name}
-                </span>
-              )
-            )}
-          </div>
-        </motion.div>
       </Container>
     </section>
   );

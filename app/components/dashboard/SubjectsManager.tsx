@@ -8,7 +8,7 @@ import { Plus, Trash2, BookOpen, Layers, ChevronRight, AlertCircle, Loader2, Cop
 import { subjectsApi, Subject } from '../../lib/subjects';
 import { analyticsApi } from '../../lib/analyticsApi';
 import { COLORS } from '../../constants/colors';
-import { Mail, Clock, Calendar } from 'lucide-react';
+import { Mail, Clock, Calendar, Link as LinkIcon, Share2, MessageSquare } from 'lucide-react';
 
 export default function SubjectsManager() {
   const router = useRouter();
@@ -19,37 +19,28 @@ export default function SubjectsManager() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   
-  // New States for Students
-  const [viewStudentsId, setViewStudentsId] = useState<string | null>(null);
-  const [students, setStudents] = useState<any[]>([]);
-  const [studentsLoading, setStudentsLoading] = useState(false);
+
 
   // Edit State
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
 
-  const fetchStudents = async (id: string) => {
-    try {
-      setStudentsLoading(true);
-      const data = await analyticsApi.getSubjectStudents(id);
-      setStudents(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setStudentsLoading(false);
-    }
-  };
 
-  const handleViewStudents = (id: string) => {
-    setViewStudentsId(id);
-    fetchStudents(id);
-  };
 
   const copyToClipboard = (code: string, id: string) => {
     navigator.clipboard.writeText(code);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const copyInviteLink = (code: string, id: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_STUDENT_APP_URL || 'http://localhost:3002';
+    const link = `${baseUrl}/join/${code}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLinkId(id);
+    setTimeout(() => setCopiedLinkId(null), 2000);
   };
 
   useEffect(() => {
@@ -124,8 +115,8 @@ export default function SubjectsManager() {
         </div>
         <Button 
           onPress={() => setCreating(true)}
-          className="font-black bg-white dark:bg-black text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800/60 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-950 transition-all"
-          startContent={<Plus size={18} className="text-slate-600 dark:text-slate-400" />}
+          className="font-black bg-white text-blue-600 border border-blue-100 shadow-sm hover:bg-blue-50 transition-all"
+          startContent={<Plus size={18} className="text-blue-600" />}
         >
           New Subject
         </Button>
@@ -171,8 +162,8 @@ export default function SubjectsManager() {
                     {/* Card Content Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform group-hover:scale-110 bg-white dark:bg-black border border-slate-200 dark:border-slate-800/50">
-                          <BookOpen size={20} className="text-slate-800 dark:text-slate-200" />
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform group-hover:scale-110 bg-blue-50 border border-blue-100">
+                          <BookOpen size={20} className="text-blue-600" />
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
@@ -181,16 +172,16 @@ export default function SubjectsManager() {
                               isIconOnly 
                               variant="light" 
                               size="sm" 
-                              className="w-6 h-6 min-w-0 text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="w-6 h-6 min-w-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
                               onClick={() => { setEditId(s.id); setEditName(s.name); }}
                             >
                               <Edit3 size={12} />
                             </Button>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Classroom Identifier</span>
-                            <div className="w-1 h-1 rounded-full bg-slate-300" />
-                             <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 uppercase">Active</span>
+                           <div className="flex items-center gap-2 mt-1">
+                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Classroom Identifier</span>
+                            <div className="w-1 h-1 rounded-full bg-slate-200" />
+                             <span className="text-[10px] font-bold text-slate-500 uppercase">Active</span>
                           </div>
                         </div>
                       </div>
@@ -208,23 +199,22 @@ export default function SubjectsManager() {
                       </Button>
                     </div>
 
-                    {/* Metrics Row */}
                     <div className="grid grid-cols-2 gap-3 mt-6">
-                      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-1 group/metric hover:bg-blue-50/30 transition-all">
                         <div className="flex items-center gap-1.5 text-slate-400">
                           <Layers size={13} />
                           <span className="text-[10px] font-black uppercase tracking-wider">Materials</span>
                         </div>
-                        <p className="text-xl font-black text-slate-800 dark:text-white tabular-nums">
+                        <p className="text-xl font-black text-slate-900 tabular-nums">
                           {s._count?.files ?? 0}
                         </p>
                       </div>
-                      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-1 group/metric hover:bg-blue-50/30 transition-all">
                         <div className="flex items-center gap-1.5 text-slate-400">
                           <Users size={13} />
                           <span className="text-[10px] font-black uppercase tracking-wider">Students</span>
                         </div>
-                        <p className="text-xl font-black text-slate-800 dark:text-white tabular-nums">
+                        <p className="text-xl font-black text-slate-900 tabular-nums">
                           {s._count?.enrollments ?? 0}
                         </p>
                       </div>
@@ -233,19 +223,36 @@ export default function SubjectsManager() {
                     {/* Class Code Section */}
                     {s.classCode && (
                       <div className="mt-4 p-3 rounded-2xl bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-slate-800/60 flex items-center justify-between group/code shadow-sm dark:shadow-none">
-                        <div>
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Quick Access Code</p>
-                          <p className="text-base font-black text-slate-900 dark:text-white tracking-[0.2em]">{s.classCode}</p>
+                        <div className="flex-1">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Invite Students</p>
+                          <div className="flex items-center gap-2">
+                             <p className="text-base font-black text-slate-900 dark:text-white tracking-[0.2em]">{s.classCode}</p>
+                             <div className="h-4 w-px bg-slate-200 mx-1" />
+                             <p className="text-[10px] font-bold text-blue-600 uppercase">Magic Link</p>
+                          </div>
                         </div>
-                        <Button 
-                          isIconOnly 
-                          size="sm" 
-                          variant="solid" 
-                          className="h-8 w-8 min-w-8 bg-white dark:bg-black shadow-sm border border-slate-200 dark:border-slate-700"
-                          onClick={() => copyToClipboard(s.classCode!, s.id)}
-                        >
-                          {copiedId === s.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-slate-400 group-hover/code:text-slate-700 dark:group-hover/code:text-slate-200 transition-colors" />}
-                        </Button>
+                         <div className="flex gap-2">
+                          <Button 
+                            isIconOnly 
+                            size="sm" 
+                            variant="flat" 
+                            className="bg-white border border-blue-100 hover:bg-blue-50 shadow-sm"
+                            onClick={() => copyInviteLink(s.classCode!, s.id)}
+                            title="Copy Invite Link"
+                          >
+                            {copiedLinkId === s.id ? <Check size={14} className="text-blue-600" /> : <Share2 size={14} className="text-blue-600" />}
+                          </Button>
+                          <Button 
+                            isIconOnly 
+                            size="sm" 
+                            variant="solid" 
+                            className="h-8 w-8 min-w-8 bg-blue-600 text-white shadow-lg shadow-blue-200"
+                            onClick={() => copyToClipboard(s.classCode!, s.id)}
+                            title="Copy Code"
+                          >
+                            {copiedId === s.id ? <Check size={14} className="text-white" /> : <Copy size={14} className="text-white" />}
+                          </Button>
+                        </div>
                       </div>
                     )}
                     
@@ -253,18 +260,18 @@ export default function SubjectsManager() {
                       <Button
                         variant="light"
                         size="sm"
-                        className="text-[11px] font-black text-slate-500 hover:text-violet-600 transition-colors uppercase tracking-widest px-0 min-w-0"
-                        onPress={() => handleViewStudents(s.id)}
+                        className="text-[11px] font-black text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-widest px-0 min-w-0"
+                        onPress={() => router.push(`/dashboard/students?subject=${encodeURIComponent(s.name)}`)}
                         startContent={<Users size={14} />}
                       >
-                        Students
+                        Manage Students
                       </Button>
-                      <Button
+                       <Button
                         variant="flat"
                         size="sm"
-                        className="bg-slate-100 dark:bg-black hover:bg-slate-200 dark:hover:bg-slate-950 text-slate-800 dark:text-white font-black text-[11px] uppercase tracking-widest h-8 border border-slate-200 dark:border-slate-800/60"
+                        className="bg-slate-50 hover:bg-slate-100 text-slate-900 font-black text-[11px] uppercase tracking-widest h-8 border border-slate-200"
                         onPress={() => router.push(`/dashboard/files?subjectId=${s.id}`)}
-                        endContent={<ChevronRight size={14} className="text-slate-500 dark:text-slate-400" />}
+                        endContent={<ChevronRight size={14} className="text-slate-400" />}
                       >
                         Manage Class
                       </Button>
@@ -367,60 +374,7 @@ export default function SubjectsManager() {
         </ModalContent>
       </Modal>
 
-      {/* View Students Modal */}
-      <Modal size="2xl" isOpen={!!viewStudentsId} onClose={() => setViewStudentsId(null)} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <h3 className="text-xl font-black flex items-center gap-2">
-              <Users size={20} className="text-violet-600" /> Subject Students
-            </h3>
-            <p className="text-xs font-medium text-slate-500 italic">View everyone enrolled in this classroom</p>
-          </ModalHeader>
-          <ModalBody className="pb-8">
-            {studentsLoading ? (
-              <div className="space-y-3 py-10">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 rounded-2xl" />)}
-              </div>
-            ) : students.length === 0 ? (
-              <div className="py-20 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mb-4 scale-x-[-1]">
-                  <Users size={32} />
-                </div>
-                <p className="text-sm font-bold text-slate-400">No students have joined yet.</p>
-                <p className="text-xs text-slate-400 mt-1 italic">Share your Class Code to get them started!</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-[1fr_120px_100px] px-4 py-2 bg-slate-50 dark:bg-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span>Student</span>
-                  <span>Joined Date</span>
-                  <span className="text-right">Time Spent</span>
-                </div>
-                {students.map((enrollment: any) => (
-                  <div key={enrollment.id} className="grid grid-cols-[1fr_120px_100px] px-4 py-3 items-center rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors border border-transparent hover:border-slate-100">
-                    <div>
-                      <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{enrollment.student.name || 'Anonymous Student'}</p>
-                      <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1">
-                        <Mail size={10} /> {enrollment.student.email}
-                      </p>
-                    </div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                      <Calendar size={12} />
-                      {new Date(enrollment.createdAt).toLocaleDateString()}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-black text-violet-600 flex items-center justify-end gap-1">
-                        <Clock size={12} />
-                        {Math.floor(enrollment.totalTimeSpent / 60)}m {enrollment.totalTimeSpent % 60}s
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+
     </div>
   );
 }

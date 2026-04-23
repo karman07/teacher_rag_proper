@@ -76,12 +76,26 @@ export default function Footer() {
                 <Zap size={16} className="text-white fill-white" />
               </div>
               <span className="font-bold text-xl text-slate-900 dark:text-white">
-                Teach<span className="text-blue-600 dark:text-blue-400">AI</span>
+                Multimodal <span className="text-blue-600 dark:text-blue-400">Teacher</span>
               </span>
             </Link>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mb-6">
-              Empowering educators with AI that knows your curriculum — answering student questions 24/7 from your own materials.
+              A high-precision RAG research project for automated curriculum intelligence. Sponsored by NVIDIA and designed to empower educators with AI that knows your materials.
             </p>
+            <div className="space-y-3 mb-8">
+              <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                <span className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">📞</span>
+                +91-8813-947793
+              </div>
+              <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                <span className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">📧</span>
+                karmansingharora01@gmail.com
+              </div>
+              <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                <span className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">📍</span>
+                A-30 Max Heights Sonepat Haryana
+              </div>
+            </div>
             <div className="flex gap-3">
               {SOCIAL.map(({ label, href, Icon }) => (
                 <a
@@ -123,7 +137,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="py-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            &copy; {year} TeachAI Inc. All rights reserved.
+            &copy; {year} Multimodal Teacher Inc. All rights reserved.
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500">
             Made with care for educators everywhere.
