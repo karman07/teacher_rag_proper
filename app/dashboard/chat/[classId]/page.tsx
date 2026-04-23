@@ -27,6 +27,7 @@ type SourceFocusRequest = {
   page?: number | null;
   chunkIdx?: number | null;
   snippet?: string | null;
+  highlightText?: string | null;
   yOffset?: number | null;
 };
 
@@ -405,6 +406,13 @@ export default function ClassroomPage() {
     // Try to find the exact file; fall back to selectedFile so the click never silently fails
     const f = files.find((item: any) => item.id === source.file_id) ?? selectedFile;
     console.log('[handleSourceClick] file_id:', source.file_id, '| found:', !!f, '| page:', source.page, '| files:', files.map((x: any) => x.id));
+    console.log('[handleSourceClick] highlight payload', {
+      hasHighlightText: !!source.highlight_text,
+      highlightLength: source.highlight_text?.length ?? 0,
+      snippetLength: source.snippet?.length ?? 0,
+      chunkIdx: source.chunk_idx,
+      page: source.page,
+    });
     if (!f) return;
 
     setSelectedFile(f);
@@ -415,6 +423,7 @@ export default function ClassroomPage() {
       page: source.page,
       chunkIdx: source.chunk_idx,
       snippet: source.snippet,
+      highlightText: source.highlight_text ?? source.snippet,
       yOffset: source.y_offset ?? null,
     });
   }, [files, selectedFile]);

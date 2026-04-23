@@ -31,6 +31,7 @@ interface PDFViewerProps {
     page?: number | null;
     chunkIdx?: number | null;
     snippet?: string | null;
+    highlightText?: string | null;
     yOffset?: number | null;
   } | null;
 }
@@ -63,6 +64,7 @@ export default function PDFViewer({
   
   const containerRef = useRef<HTMLDivElement>(null);
   const drawingRef = useRef<{ x: number; y: number } | null>(null);
+  const similarityHighlightedSpansRef = useRef<HTMLElement[]>([]);
 
   const isPDF = mimeType.includes('pdf');
   const isImage = mimeType.includes('image');
@@ -182,8 +184,27 @@ export default function PDFViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Plugins: called unconditionally at top level (they use hooks internally) ---
-  // Highlight plugin: only for text selection → Note creation (no renderHighlights)
+  const debugLog = (...args: any[]) => {
+    console.log('[PDFViewer]', ...args);
+  };
+
+  const clearSimilarityHighlights = useCallback(() => {
+    for (const el of similarityHighlightedSpansRef.current) {
+      const prevBg = el.dataset.simPrevBg ?? '';
+      const prevRadius = el.dataset.simPrevRadius ?? '';
+      const prevShadow = el.dataset.simPrevShadow ?? '';
+      el.style.background = prevBg;
+      el.style.borderRadius = prevRadius;
+      el.style.boxShadow = prevShadow;
+      delete el.dataset.simPrevBg;
+      delete el.dataset.simPrevRadius;
+      delete el.dataset.simPrevShadow;
+    }
+    similarityHighlightedSpansRef.current = [];
+  }, []);
+
+  // Keep plugin creation at top-level render. This plugin internally uses hooks,
+  // so wrapping it in useMemo callback breaks Rules of Hooks.
   const highlightPluginInstance = highlightPlugin({
     renderHighlightTarget,
     renderHighlightContent,
@@ -191,33 +212,53 @@ export default function PDFViewer({
 
   const searchPluginInstance = searchPlugin();
   const zoomPluginInstance = zoomPlugin();
+  const jumpToPageRef = useRef<((pageIndex: number) => Promise<void> | void) | null>(null);
 
-  // Stable plugins array
-  const plugins = useMemo(
-    () => [highlightPluginInstance, searchPluginInstance, zoomPluginInstance],
-    [highlightPluginInstance, searchPluginInstance, zoomPluginInstance]
-  );
+  const navigationBridgePlugin = useMemo(() => ({
+    install: (pluginFunctions: any) => {
+      jumpToPageRef.current = pluginFunctions?.jumpToPage ?? null;
+      debugLog('navigation bridge installed', { hasJumpToPage: !!jumpToPageRef.current });
+    },
+    uninstall: () => {
+      jumpToPageRef.current = null;
+    },
+  }), []);
+
+  const plugins = useMemo(() => [
+    highlightPluginInstance,
+    searchPluginInstance,
+    zoomPluginInstance,
+    navigationBridgePlugin,
+  ], [highlightPluginInstance, searchPluginInstance, zoomPluginInstance, navigationBridgePlugin]);
 
   // Store plugin methods in refs to avoid effect dependency loops
   const highlightMethodRef = useRef(searchPluginInstance.highlight);
   highlightMethodRef.current = searchPluginInstance.highlight;
+  const clearHighlightsRef = useRef(searchPluginInstance.clearHighlights);
+  clearHighlightsRef.current = searchPluginInstance.clearHighlights;
+  const setTargetPagesRef = useRef(searchPluginInstance.setTargetPages);
+  setTargetPagesRef.current = searchPluginInstance.setTargetPages;
+  const jumpToMatchRef = useRef(searchPluginInstance.jumpToMatch);
+  jumpToMatchRef.current = searchPluginInstance.jumpToMatch;
 
   // Zoom handlers: call plugin directly + update UI state
   const handleZoomIn = useCallback(() => {
     setScale(prev => {
       const next = Math.min(3, prev + 0.1);
+      debugLog('zoom in', { prev, next, hasZoomTo: !!zoomPluginInstance.zoomTo });
       zoomPluginInstance.zoomTo(next);
       return next;
     });
-  }, [zoomPluginInstance]);
+  }, [debugLog, zoomPluginInstance]);
 
   const handleZoomOut = useCallback(() => {
     setScale(prev => {
       const next = Math.max(0.5, prev - 0.1);
+      debugLog('zoom out', { prev, next, hasZoomTo: !!zoomPluginInstance.zoomTo });
       zoomPluginInstance.zoomTo(next);
       return next;
     });
-  }, [zoomPluginInstance]);
+  }, [debugLog, zoomPluginInstance]);
 
   // React to source focus requests — DOM-based page scrolling + search highlight
   const lastSourceRequestId = useRef<string | null>(null);
@@ -225,61 +266,289 @@ export default function PDFViewer({
     if (!sourceFocusRequest || !isPDF) return;
     if (lastSourceRequestId.current === sourceFocusRequest.requestId) return;
     lastSourceRequestId.current = sourceFocusRequest.requestId;
+    clearSimilarityHighlights();
 
-    console.log('[PDFViewer] sourceFocusRequest received:', sourceFocusRequest);
+    const timers: number[] = [];
+    const pushTimer = (id: number) => timers.push(id);
+    const cleanupTimers = () => timers.forEach((id) => window.clearTimeout(id));
 
-    const { page, snippet } = sourceFocusRequest;
+    debugLog('sourceFocusRequest received', sourceFocusRequest);
+
+    const { page, snippet, highlightText } = sourceFocusRequest;
+
+    const findPageLayer = (targetPage: number) => {
+      const container = containerRef.current;
+      if (!container || targetPage <= 0) return null;
+      return container.querySelector(`[data-testid="core__page-layer-${targetPage - 1}"]`) as HTMLElement | null;
+    };
 
     // Scroll to target page via DOM
     if (page && page > 0) {
       setCurrentPage(page);
       onPageChange?.(page);
 
-      setTimeout(() => {
+      const targetIndex = page - 1;
+      if (jumpToPageRef.current) {
+        debugLog('jumpToPage call', { page, targetIndex });
+        Promise.resolve(jumpToPageRef.current(targetIndex))
+          .then(() => debugLog('jumpToPage resolved', { page, targetIndex }))
+          .catch((error) => console.error('[PDFViewer] jumpToPage failed', error));
+      } else {
+        debugLog('jumpToPage unavailable, using page-layer lookup only');
+      }
+
+      pushTimer(window.setTimeout(() => {
         const container = containerRef.current;
-        console.log('[PDFViewer] container ref:', !!container);
+        debugLog('container ref', !!container);
         if (!container) return;
 
         // Debug: log all children class names to understand DOM structure
         const allEls = container.querySelectorAll('[data-testid]');
-        console.log('[PDFViewer] data-testid elements:', Array.from(allEls).map(e => e.getAttribute('data-testid')).slice(0, 10));
-        const rpvClasses = container.querySelectorAll('[class*="rpv-core"]');
-        console.log('[PDFViewer] rpv-core elements:', Array.from(rpvClasses).map(e => e.className).slice(0, 10));
+        debugLog('data-testid elements', Array.from(allEls).map(e => e.getAttribute('data-testid')).slice(0, 10));
 
-        // Try data-testid first
-        const pageEl = container.querySelector(
-          `[data-testid="core__page-layer-${page - 1}"]`
-        ) as HTMLElement;
-        console.log('[PDFViewer] pageEl by data-testid:', !!pageEl);
+        // Try direct target page layer first
+        const pageEl = findPageLayer(page);
+        debugLog('page element by data-testid', !!pageEl);
 
         if (pageEl) {
           pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
-          // Broader fallback: any element with page-related classes
-          const allPages = container.querySelectorAll('[class*="page-layer"], [class*="inner-page"], [data-testid*="page"]');
-          console.log('[PDFViewer] fallback page elements found:', allPages.length);
-          const target = allPages[page - 1] as HTMLElement;
-          if (target) {
-            console.log('[PDFViewer] scrolling to fallback target:', target.className || target.getAttribute('data-testid'));
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } else {
-            console.warn('[PDFViewer] No page element found for page', page);
-          }
+          debugLog('target page layer still missing after jump', { page });
         }
-      }, 400);
+      }, 420));
     }
 
     // Highlight snippet text via search plugin
-    if (snippet) {
-       const cleanSnippet = snippet.replace(/\[\/?source.*?\]/g, '').trim().substring(0, 100);
-       console.log('[PDFViewer] highlighting snippet:', cleanSnippet);
-       setTimeout(() => {
-         console.log('[PDFViewer] highlight method exists:', !!highlightMethodRef.current);
-         highlightMethodRef.current?.(cleanSnippet);
-       }, 800);
+    const effectiveHighlight = (highlightText || snippet || '').replace(/\[\/?source.*?\]/g, '').trim();
+    if (effectiveHighlight) {
+      const normalizeForSearch = (input: string) => {
+        return input
+          .normalize('NFKC')
+          .replace(/[•◦●·]/g, ' ')
+          .replace(/[^\p{L}\p{N}\s.,:%()\/-]/gu, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const buildCandidates = (primary: string, fallback?: string | null) => {
+        const rawInputs = [primary, fallback || ''].filter(Boolean);
+        const out: string[] = [];
+
+        const addCandidate = (candidate: string, minLen = 12) => {
+          const v = candidate.trim();
+          if (v.length >= minLen) out.push(v);
+        };
+
+        for (const raw of rawInputs) {
+          const normalized = normalizeForSearch(raw);
+          if (!normalized) continue;
+
+          addCandidate(normalized, 18);
+          addCandidate(normalized.replace(/[.,;:()]/g, ' ').replace(/\s+/g, ' '), 18);
+
+          const words = normalized.split(' ').filter((w) => w.length > 2);
+          if (words.length >= 10) {
+            addCandidate(words.slice(0, 10).join(' '), 16);
+            const mid = Math.max(0, Math.floor(words.length / 2) - 5);
+            addCandidate(words.slice(mid, mid + 10).join(' '), 16);
+            addCandidate(words.slice(-10).join(' '), 16);
+          }
+          if (words.length >= 6) {
+            addCandidate(words.slice(0, 6).join(' '), 12);
+            addCandidate(words.slice(-6).join(' '), 12);
+          }
+        }
+
+        return Array.from(new Set(out));
+      };
+
+      const candidates = buildCandidates(effectiveHighlight, snippet);
+      const strictCandidates = candidates.filter((c) => c.length >= 24);
+      const looseCandidates = candidates.filter((c) => c.length >= 12);
+
+      debugLog('highlight candidates prepared', {
+        total: candidates.length,
+        strict: strictCandidates.length,
+        loose: looseCandidates.length,
+      });
+
+      const maxAttempts = 18;
+      let attempts = 0;
+
+      if (page && page > 0) {
+        const targetIndex = page - 1;
+        const hasExactHighlight = !!(highlightText && highlightText.trim());
+        setTargetPagesRef.current?.((target) => {
+          if (hasExactHighlight) {
+            return target.pageIndex === targetIndex;
+          }
+          // Heuristic snippets can be slightly off in page metadata.
+          return Math.abs(target.pageIndex - targetIndex) <= 2;
+        });
+        debugLog('search target page set', {
+          page,
+          targetIndex,
+          hasExactHighlight,
+          window: hasExactHighlight ? 0 : 2,
+        });
+      }
+
+      const tryHighlight = async () => {
+        attempts += 1;
+        const keywordBatch = attempts <= 6 ? strictCandidates : looseCandidates;
+        const searchKeywords = (keywordBatch.length ? keywordBatch : looseCandidates)
+          .slice(0, attempts <= 6 ? 6 : 10)
+          .map((k) => ({ keyword: k, matchCase: false, wholeWords: false }));
+
+        const pageLayerReady = !page || page <= 0 ? true : !!findPageLayer(page);
+        debugLog('highlight attempt', {
+          attempts,
+          keywordsTried: searchKeywords.length,
+          sampleKeywordLength: searchKeywords[0]?.keyword?.length ?? 0,
+          usingFallback: attempts > 6,
+          hasHighlightMethod: !!highlightMethodRef.current,
+          pageLayerReady,
+        });
+
+        try {
+          clearHighlightsRef.current?.();
+
+          const matches = await Promise.resolve(highlightMethodRef.current?.(searchKeywords) || []);
+          const matchedCount = Array.isArray(matches) ? matches.length : 0;
+
+          debugLog('highlight result', {
+            attempts,
+            matchedCount,
+            matchedPages: Array.isArray(matches) ? Array.from(new Set(matches.map((m: any) => m.pageIndex))) : [],
+          });
+
+          if (matchedCount > 0) {
+            jumpToMatchRef.current?.(0);
+            debugLog('highlight finished', {
+              attempts,
+              success: true,
+              matchedCount,
+            });
+            return;
+          }
+
+          // Fallback: similarity-match against rendered text spans on target page.
+          const trySimilarityHighlight = () => {
+            if (!page || page <= 0) return false;
+
+            const pageLayer = findPageLayer(page);
+            if (!pageLayer) return false;
+
+            const textLayer = pageLayer.querySelector(`[data-testid="core__text-layer-${page - 1}"]`) as HTMLElement | null;
+            if (!textLayer) return false;
+
+            const spanEls = Array.from(textLayer.querySelectorAll('.rpv-core__text-layer-text')) as HTMLElement[];
+            if (!spanEls.length) return false;
+
+            const normalize = (s: string) => s
+              .normalize('NFKC')
+              .toLowerCase()
+              .replace(/[•◦●·]/g, ' ')
+              .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+
+            const query = normalize(effectiveHighlight || snippet || '');
+            const queryTokens = new Set(query.split(' ').filter((t) => t.length > 2));
+            if (!queryTokens.size) return false;
+
+            let best: { start: number; end: number; score: number } | null = null;
+
+            for (let i = 0; i < spanEls.length; i++) {
+              let combined = '';
+              const maxWindow = Math.min(i + 8, spanEls.length);
+              for (let j = i; j < maxWindow; j++) {
+                const t = normalize(spanEls[j].textContent || '');
+                if (!t) continue;
+                combined = combined ? `${combined} ${t}` : t;
+
+                const tokens = new Set(combined.split(' ').filter((w) => w.length > 2));
+                if (!tokens.size) continue;
+
+                let overlap = 0;
+                queryTokens.forEach((tok) => {
+                  if (tokens.has(tok)) overlap += 1;
+                });
+
+                const recall = overlap / queryTokens.size;
+                const precision = overlap / Math.max(tokens.size, 1);
+                const score = (0.72 * recall) + (0.28 * precision);
+
+                if (!best || score > best.score) {
+                  best = { start: i, end: j, score };
+                }
+              }
+            }
+
+            if (!best || best.score < 0.2) {
+              debugLog('similarity fallback: no strong span match', { score: best?.score ?? 0 });
+              return false;
+            }
+
+            clearSimilarityHighlights();
+            const selected = spanEls.slice(best.start, best.end + 1);
+            selected.forEach((el) => {
+              el.dataset.simPrevBg = el.style.background || '';
+              el.dataset.simPrevRadius = el.style.borderRadius || '';
+              el.dataset.simPrevShadow = el.style.boxShadow || '';
+              el.style.background = 'rgba(250, 204, 21, 0.45)';
+              el.style.borderRadius = '4px';
+              el.style.boxShadow = '0 0 0 1px rgba(234, 179, 8, 0.35)';
+            });
+            similarityHighlightedSpansRef.current = selected;
+            selected[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            debugLog('similarity fallback applied', {
+              score: best.score,
+              spanStart: best.start,
+              spanEnd: best.end,
+              spanCount: selected.length,
+            });
+            return true;
+          };
+
+          if (attempts >= 4 && trySimilarityHighlight()) {
+            debugLog('highlight finished', {
+              attempts,
+              success: true,
+              via: 'similarity-fallback',
+            });
+            return;
+          }
+        } catch (error) {
+          console.error('[PDFViewer] highlight call failed', error);
+        }
+
+        if (attempts >= maxAttempts) {
+          debugLog('highlight finished', {
+            attempts,
+            success: false,
+            candidatesTried: looseCandidates.length,
+          });
+          return;
+        }
+
+        const delay = attempts < 4 ? 120 : 220;
+        pushTimer(window.setTimeout(tryHighlight, delay));
+      };
+
+      // First attempt quickly, then retry while PDF text layers settle.
+      pushTimer(window.setTimeout(tryHighlight, 520));
+    } else {
+      debugLog('no highlight text found in sourceFocusRequest');
     }
+
+    return () => {
+      setTargetPagesRef.current?.(() => true);
+      clearSimilarityHighlights();
+      cleanupTimers();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceFocusRequest, isPDF]);
+  }, [sourceFocusRequest, isPDF, clearSimilarityHighlights]);
 
   // --- renderPage: inject note highlight overlays directly into each page ---
   const renderPage: RenderPage = useCallback((props: RenderPageProps) => {
@@ -573,6 +842,7 @@ function NoteOverlayLayer({ pageIndex, allNotes, onNoteClick }: {
     </div>
   );
 }
+
 
 // --- Note creation form (own component so it can use useState safely) ---
 function HighlightContentForm({ props, classIdRef, selectedFileIdRef, tokenRef, fetchNotesRef }: {
