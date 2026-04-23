@@ -62,4 +62,82 @@ export const studentApi = {
     const res = await axios.delete(`${API_URL}/students/notes/${noteId}`, { headers: getAuthHeaders() });
     return res.data;
   },
+
+  // ─── Analytics ──────────────────────────────────────────────────────────────
+  getPersonalAnalytics: async (timeframe: '7d' | '30d' | 'all' = '7d') => {
+    const res = await axios.get(`${API_URL}/analytics/student/personal?timeframe=${timeframe}`, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  logQuery: async (data: { 
+    question: string; 
+    answer: string; 
+    subjectId: string; 
+    fileId?: string; 
+    topic?: string;
+    responseMs?: number;
+    chunkCount?: number;
+  }) => {
+    const res = await axios.post(`${API_URL}/analytics/log`, { 
+      ...data, 
+      askedBy: 'student' 
+    }, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  logActivity: async (type: string, subjectId?: string, metadata?: any) => {
+    try {
+      await axios.post(`${API_URL}/analytics/activity`, { type, subjectId, metadata }, { headers: getAuthHeaders() });
+    } catch (err) {
+      // Slient fail for analytics to not disturb user
+      console.warn('Analytics log failed');
+    }
+  },
+
+  // ─── Chat History ────────────────────────────────────────────────────────────
+
+  getChatSessions: async (subjectId: string) => {
+    const res = await axios.get(`${API_URL}/students/classes/${subjectId}/chat-sessions`, { headers: getAuthHeaders() });
+    return res.data as ChatSession[];
+  },
+
+  createChatSession: async (subjectId: string, title?: string) => {
+    const res = await axios.post(`${API_URL}/students/classes/${subjectId}/chat-sessions`, { title }, { headers: getAuthHeaders() });
+    return res.data as ChatSession;
+  },
+
+  getChatMessages: async (sessionId: string) => {
+    const res = await axios.get(`${API_URL}/students/chat-sessions/${sessionId}/messages`, { headers: getAuthHeaders() });
+    return res.data as StoredChatMessage[];
+  },
+
+  appendChatMessage: async (sessionId: string, role: string, content: string, sources?: any[]) => {
+    const res = await axios.post(`${API_URL}/students/chat-sessions/${sessionId}/messages`, { role, content, sources }, { headers: getAuthHeaders() });
+    return res.data;
+  },
+
+  deleteChatSession: async (sessionId: string) => {
+    const res = await axios.delete(`${API_URL}/students/chat-sessions/${sessionId}`, { headers: getAuthHeaders() });
+    return res.data;
+  },
 };
+
+// ─── Chat Types ───────────────────────────────────────────────────────────────
+export interface ChatSession {
+  id: string;
+  subjectId: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages?: { content: string; createdAt: string }[];
+  _count?: { messages: number };
+}
+
+export interface StoredChatMessage {
+  id: string;
+  sessionId: string;
+  role: string;
+  content: string;
+  sources?: any[];
+  createdAt: string;
+}

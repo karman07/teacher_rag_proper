@@ -44,7 +44,7 @@ const TOPIC_KEYWORDS: Record<string, string[]> = {
 };
 
 // ── Extract topics from a question ────────────────────────────────────────────
-function extractTopics(question: string): string[] {
+export function extractTopics(question: string): string[] {
   const lower = question.toLowerCase();
   const found: string[] = [];
 

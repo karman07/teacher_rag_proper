@@ -8,19 +8,18 @@ import {
   Database, MessageSquare, BookOpen, Sparkles,
   ChevronRight, X, Menu, Download, ExternalLink,
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight as ChevronRightIcon,
-  RotateCcw,
+  RotateCcw, Video, Image as ImageIcon, Music, History, Plus,
 } from 'lucide-react';
-import { studentApi, incrementQuestionsAsked } from '@/app/lib/api';
+import { studentApi, incrementQuestionsAsked, ChatSession } from '@/app/lib/api';
 import { queryRAG, ChatMessage, RAGSource } from '@/app/lib/rag';
-import { saveQuestionRecord } from '@/app/lib/analytics';
+import { saveQuestionRecord, extractTopics } from '@/app/lib/analytics';
+import dynamic from 'next/dynamic';
 
 interface AugmentedMessage extends ChatMessage {
   id: string;
   sources?: RAGSource[];
   isError?: boolean;
 }
-
-import dynamic from 'next/dynamic';
 
 type SourceFocusRequest = {
   requestId: string;
@@ -233,6 +232,9 @@ const PDFViewer = dynamic(() => import('./PDFViewer'), {
 });
 
 const NotesArea = dynamic(() => import('./NotesArea'), { ssr: false });
+const VoiceInput = dynamic(() => import('@/app/components/VoiceInput'), { ssr: false });
+const ChatHistorySidebar = dynamic(() => import('@/app/components/ChatHistorySidebar'), { ssr: false });
+const SpeakButton = dynamic(() => import('@/app/components/SpeakButton'), { ssr: false });
 
 export default function ClassroomPage() {
   const { classId } = useParams<{ classId: string }>();
@@ -255,12 +257,29 @@ export default function ClassroomPage() {
   const [sourceFocusRequest, setSourceFocusRequest] = useState<SourceFocusRequest | null>(null);
 
   const [libOpen, setLibOpen]       = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // ── Session state ──
+  const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
+  const activeSessionRef = useRef<ChatSession | null>(null);
+  activeSessionRef.current = activeSession;
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchClass(); }, [classId]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  // ── Auto-create a session when classroom loads ──
+  const ensureSession = useCallback(async (subjectId: string) => {
+    if (activeSessionRef.current) return;
+    try {
+      const session = await studentApi.createChatSession(subjectId);
+      setActiveSession(session);
+    } catch (e) {
+      console.warn('Could not create chat session', e);
+    }
+  }, []);
 
   const fetchClass = async () => {
     try {
@@ -269,12 +288,43 @@ export default function ClassroomPage() {
       const f = data.files || [];
       setFiles(f);
       if (f.length > 0) setSelectedFile(f[0]);
+      // Create a new session for this visit
+      ensureSession(classId);
     } catch {
       router.push('/dashboard');
     } finally {
       setLoadingClass(false);
     }
   };
+
+  // ── Load session messages when switching sessions ──
+  const loadSession = useCallback(async (session: ChatSession) => {
+    setActiveSession(session);
+    setMessages([]);
+    setHistoryOpen(false);
+    try {
+      const stored = await studentApi.getChatMessages(session.id);
+      const loaded: AugmentedMessage[] = stored.map(m => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        sources: m.sources as RAGSource[] | undefined,
+      }));
+      setMessages(loaded);
+    } catch (e) {
+      console.warn('Could not load session messages', e);
+    }
+  }, []);
+
+  const startNewSession = useCallback(async () => {
+    setMessages([]);
+    setActiveSession(null);
+    setHistoryOpen(false);
+    try {
+      const session = await studentApi.createChatSession(classId);
+      setActiveSession(session);
+    } catch {}
+  }, [classId]);
 
   const sendMessage = async (overrideQuery?: string, imageBase64?: string) => {
     // Strict string coercion — prevents [object Object] artifacts
@@ -290,16 +340,20 @@ export default function ClassroomPage() {
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
     incrementQuestionsAsked();
+
+    // Persist user message to backend
+    const sessionId = activeSessionRef.current?.id;
+    if (sessionId) {
+      studentApi.appendChatMessage(sessionId, 'user', displayContent).catch(() => {});
+    }
+
     // Track question for analytics
     if (q) {
-      saveQuestionRecord(
-        q,
-        classId,
-        classroom?.name || 'Unknown Subject',
-      );
+      saveQuestionRecord(q, classId, classroom?.name || 'Unknown Subject');
     }
 
     try {
+      const startTime = Date.now();
       const res = await queryRAG(
         q || '',
         String(classroom?.collectionName || ''),
@@ -308,6 +362,8 @@ export default function ClassroomPage() {
         chatScope === 'file' ? selectedFile?.id : undefined,
         imageBase64
       );
+      const responseMs = Date.now() - startTime;
+      
       const botMsg: AugmentedMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -315,6 +371,23 @@ export default function ClassroomPage() {
         sources: res.sources,
       };
       setMessages(prev => [...prev, botMsg]);
+
+      // Persist assistant message to backend
+      if (sessionId) {
+        studentApi.appendChatMessage(sessionId, 'assistant', botMsg.content, res.sources).catch(() => {});
+      }
+
+      // ── Backend Logging ──
+      studentApi.logQuery({
+        question: q || 'Image Analysis',
+        answer: botMsg.content,
+        subjectId: classId,
+        fileId: chatScope === 'file' ? selectedFile?.id : undefined,
+        responseMs,
+        chunkCount: res.sources?.length,
+        topic: (extractTopics(q || '') || [])[0],
+      }).catch(e => console.error('Failed to log query to backend:', e));
+
     } catch (err) {
       console.error('sendMessage error:', err);
       setMessages(prev => [...prev, {
@@ -406,13 +479,23 @@ export default function ClassroomPage() {
               }`}
             >
               <div className={`p-2.5 rounded-xl shrink-0 ${active ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
-                <FileText size={18} />
+                {file.mimeType?.includes('video') ? <Video size={18} /> : 
+                 file.mimeType?.includes('image') ? <ImageIcon size={18} /> : 
+                 file.mimeType?.includes('audio') ? <Music size={18} /> : 
+                 <FileText size={18} />}
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
                 <p className="text-sm font-bold truncate">{name}</p>
-                <p className={`text-xs mt-1 font-medium ${active ? 'text-blue-100' : 'text-slate-500'}`}>
-                  {sizeMB} {file.mimeType ? `• ${file.mimeType.split('/')[1]?.toUpperCase()}` : ''}
-                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <p className={`text-[10px] font-medium ${active ? 'text-blue-100' : 'text-slate-500'}`}>
+                    {sizeMB} {file.mimeType ? `• ${file.mimeType.split('/')[1]?.toUpperCase()}` : ''}
+                  </p>
+                  {file.isAssignment && (
+                    <div className={`px-1.5 py-0.5 rounded border ${active ? 'bg-white/20 border-white/20 text-white' : 'bg-amber-50 border-amber-100 text-amber-600'} text-[8px] font-black uppercase tracking-wider flex items-center gap-1`}>
+                      <Sparkles size={8} /> Assignment
+                    </div>
+                  )}
+                </div>
               </div>
               {active && <ChevronRight size={18} className="mt-1 text-blue-200" />}
             </button>
@@ -436,7 +519,7 @@ export default function ClassroomPage() {
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
       {/* Top Header */}
       <header className="shrink-0 h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 z-30 shadow-sm relative">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/dashboard')}
             className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors"
@@ -454,11 +537,30 @@ export default function ClassroomPage() {
             <BookOpen size={18} />
           </button>
 
+          {/* History toggle */}
+          <button
+            onClick={() => setHistoryOpen(o => !o)}
+            className={`hidden xl:flex w-10 h-10 rounded-xl items-center justify-center transition-all border shadow-sm ${
+              historyOpen ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+            title="Chat History"
+          >
+            <History size={18} />
+          </button>
+
           <div className="flex flex-col">
             <h1 className="text-lg font-black text-slate-900 leading-none">{classroom?.name}</h1>
             <div className="flex items-center gap-1.5 mt-1">
               <Bot size={12} className="text-blue-600" />
               <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">AI Workspace</span>
+              {activeSession && (
+                <>
+                  <span className="text-[10px] text-slate-300">·</span>
+                  <span className="text-[10px] font-bold text-blue-500 truncate max-w-[120px]">
+                    {activeSession.title || 'New session'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -468,6 +570,16 @@ export default function ClassroomPage() {
             <p className="label-caps mr-1 text-slate-500">Instructor</p>
             <p className="text-sm font-bold text-slate-800">{classroom?.teacher?.name}</p>
           </div>
+
+          {/* New chat button in header */}
+          <button
+            onClick={startNewSession}
+            className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            title="Start new chat"
+          >
+            <Plus size={14} />
+            <span className="hidden lg:inline">New Chat</span>
+          </button>
 
           <button
             onClick={() => setShowDoc(!showDoc)}
@@ -490,14 +602,32 @@ export default function ClassroomPage() {
 
       {/* Body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar Desktop */}
+        {/* Sidebar Desktop: Library */}
         <motion.aside 
-          animate={{ width: libOpen ? 320 : 0, opacity: libOpen ? 1 : 0 }}
+          animate={{ width: libOpen && !historyOpen ? 320 : 0, opacity: libOpen && !historyOpen ? 1 : 0 }}
           transition={{ duration: 0.3, ease: 'circOut' }}
           className="hidden xl:flex flex-col shrink-0 border-r border-slate-200 bg-white z-20 overflow-hidden relative"
         >
           <div className="w-80 h-full">
             <FileSidebar />
+          </div>
+        </motion.aside>
+
+        {/* Sidebar Desktop: Chat History */}
+        <motion.aside
+          animate={{ width: historyOpen ? 280 : 0, opacity: historyOpen ? 1 : 0 }}
+          transition={{ duration: 0.3, ease: 'circOut' }}
+          className="hidden xl:flex flex-col shrink-0 border-r border-slate-200 bg-white z-20 overflow-hidden"
+        >
+          <div className="w-[280px] h-full">
+            {historyOpen && (
+              <ChatHistorySidebar
+                subjectId={classId}
+                activeSessionId={activeSession?.id ?? null}
+                onSelectSession={loadSession}
+                onNewSession={startNewSession}
+              />
+            )}
           </div>
         </motion.aside>
 
@@ -659,6 +789,11 @@ export default function ClassroomPage() {
                               sources={msg.sources}
                               onSourceClick={handleSourceClick}
                             />
+                            {msg.role === 'assistant' && !msg.isError && (
+                              <div className="mt-3 flex justify-end">
+                                <SpeakButton text={msg.content} />
+                              </div>
+                            )}
                           </div>
 
                           {/* ── Formal Sources Reference Panel ── */}
@@ -726,7 +861,7 @@ export default function ClassroomPage() {
                 </div>
 
                 <div className="p-5 shrink-0 bg-white border-t border-slate-100/50">
-                  <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-slate-50 border-2 border-slate-100 focus-within:border-blue-600 focus-within:bg-white focus-within:shadow-xl focus-within:shadow-blue-500/5 transition-all">
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-slate-50 border-2 border-slate-100 focus-within:border-blue-600 focus-within:bg-white focus-within:shadow-xl focus-within:shadow-blue-500/5 transition-all">
                     <input
                       ref={inputRef}
                       type="text"
@@ -735,6 +870,14 @@ export default function ClassroomPage() {
                       onChange={e => setInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       className="flex-1 bg-transparent text-sm font-black outline-none text-slate-800 placeholder-slate-400 h-10 tracking-tight"
+                    />
+                    {/* Voice input */}
+                    <VoiceInput
+                      onTranscript={(text) => {
+                        setInput(text);
+                        inputRef.current?.focus();
+                      }}
+                      disabled={sending}
                     />
                     <button 
                       onClick={() => sendMessage()} 

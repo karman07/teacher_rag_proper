@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Mail, Lock, User, GraduationCap, ArrowRight, Eye, EyeOff, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
 export default function StudentSignup() {
@@ -14,6 +14,8 @@ export default function StudentSignup() {
   const [error, setError] = useState('');
   const { signup } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +27,7 @@ export default function StudentSignup() {
     setError('');
     try {
       await signup(formData.name, formData.email, formData.password);
-      router.push('/dashboard');
+      router.push(callbackUrl);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {

@@ -14,16 +14,12 @@ import dynamic from 'next/dynamic';
 
 const AnalyticsPanel = dynamic(() => import('@/app/components/AnalyticsPanel'), { ssr: false });
 
-/* Light theme colors per class, minimal and clean */
+/* Professional blue theme for all cards */
 const COLORS = [
-  { bg: '#eff6ff', border: '#bfdbfe', text: '#2563eb' }, // Blue
-  { bg: '#faf5ff', border: '#e9d5ff', text: '#9333ea' }, // Purple
-  { bg: '#f0fdfa', border: '#ccfbf1', text: '#0d9488' }, // Teal
-  { bg: '#fffbeb', border: '#fde68a', text: '#d97706' }, // Amber
-  { bg: '#fef2f2', border: '#fecaca', text: '#dc2626' }, // Red
+  { bg: 'var(--primary-light)', border: 'var(--card-border)', text: 'var(--primary)' },
 ];
 
-const palette = (i: number) => COLORS[i % COLORS.length];
+const palette = (_: number) => COLORS[0];
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
@@ -81,7 +77,7 @@ export default function StudentDashboard() {
               <GraduationCap size={22} strokeWidth={2.5} />
             </div>
             <span className="font-black text-xl tracking-tight text-slate-900">
-              TeachAI <span style={{ color: 'var(--primary)' }}>Student</span>
+              Multimodal <span style={{ color: 'var(--primary)' }}>Student</span>
             </span>
           </div>
 
@@ -140,16 +136,16 @@ export default function StudentDashboard() {
               label: 'Total Materials',
               value: loading ? '—' : totalMaterials,
               icon: <BookOpen size={24} />,
-              color: '#0d9488',
-              bg: '#f0fdfa',
+              color: '#0284c7', // Sky Blue
+              bg: '#f0f9ff',
               sub: 'documents available',
             },
             {
               label: 'Questions Asked',
               value: questionsAsked,
               icon: <MessageSquare size={24} />,
-              color: '#9333ea',
-              bg: '#faf5ff',
+              color: 'var(--primary)',
+              bg: 'var(--primary-light)',
               sub: 'with the AI assistant',
             },
           ].map((stat, i) => (

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Mail, Lock, GraduationCap, ArrowRight, Eye, EyeOff, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
 export default function StudentLogin() {
@@ -14,6 +14,8 @@ export default function StudentLogin() {
   const [error, setError] = useState('');
   const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +23,7 @@ export default function StudentLogin() {
     setError('');
     try {
       await login(formData.email, formData.password);
-      router.push('/dashboard');
+      router.push(callbackUrl);
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {
@@ -34,7 +36,7 @@ export default function StudentLogin() {
     setError('');
     try {
       await loginWithGoogle();
-      router.push('/dashboard');
+      router.push(callbackUrl);
     } catch (err: any) {
       setError('Google login failed. Please try again.');
     } finally {
@@ -170,7 +172,7 @@ export default function StudentLogin() {
           </form>
 
           <p className="mt-8 text-center text-sm font-medium" style={{ color: "var(--muted)" }}>
-            New to TeachAI?{' '}
+            New to Multimodal Student?{' '}
             <Link href="/signup" className="font-bold hover:underline" style={{ color: "var(--primary)" }}>
               Create account
             </Link>

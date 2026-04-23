@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, ZoomIn, ZoomOut, X, Download, Image as ImageIcon, FileDigit, Scissors, Sparkles, Bot, Edit3, Trash2 } from 'lucide-react';
+import { FileText, ZoomIn, ZoomOut, X, Download, Image as ImageIcon, FileDigit, Scissors, Sparkles, Bot, Edit3, Trash2, Video, Music } from 'lucide-react';
 import { Viewer, Worker } from '@react-pdf-viewer/core';
 import type { RenderPage, RenderPageProps } from '@react-pdf-viewer/core';
 import { highlightPlugin, RenderHighlightTargetProps, RenderHighlightContentProps } from '@react-pdf-viewer/highlight';
@@ -66,6 +66,8 @@ export default function PDFViewer({
 
   const isPDF = mimeType.includes('pdf');
   const isImage = mimeType.includes('image');
+  const isVideo = mimeType.includes('video');
+  const isAudio = mimeType.includes('audio');
   const token = typeof window !== 'undefined' ? localStorage.getItem('student-token') : '';
   const authenticatedUrl = `${url}${url.includes('?') ? '&' : '?'}token=${token}`;
 
@@ -103,7 +105,15 @@ export default function PDFViewer({
   const fetchNotesRef = useRef(fetchNotes);
   fetchNotesRef.current = fetchNotes;
 
-  useEffect(() => { fetchNotes(); }, [fetchNotes, classId, selectedFileId]);
+  useEffect(() => { 
+    fetchNotes(); 
+    // Log file open activity
+    if (classId && selectedFileId) {
+      import('@/app/lib/api').then(({ studentApi }) => {
+        studentApi.logActivity('file_open', classId, { fileId: selectedFileId, fileName });
+      });
+    }
+  }, [fetchNotes, classId, selectedFileId, fileName]);
 
   const handleDeleteNote = async (id: string) => {
     try {
@@ -368,7 +378,7 @@ export default function PDFViewer({
       <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-slate-100 bg-slate-50/80 z-20">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 rounded-xl bg-blue-100 text-blue-600 shrink-0">
-            {isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
+            {isVideo ? <Video size={16} /> : isAudio ? <Music size={16} /> : isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
           </div>
           <div className="min-w-0">
             <span className="text-sm font-bold truncate block max-w-[180px] text-slate-800" title={fileName}>{fileName}</span>
@@ -434,6 +444,28 @@ export default function PDFViewer({
           ) : isImage ? (
             <div className="flex justify-center p-4">
               <img src={authenticatedUrl} alt={fileName} className="max-w-full rounded-lg shadow-2xl" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
+            </div>
+          ) : isVideo ? (
+            <div className="h-full flex items-center justify-center p-4 bg-slate-900 border-2 border-dashed border-slate-700 m-2 rounded-2xl overflow-hidden shadow-2xl">
+              <video 
+                src={authenticatedUrl} 
+                controls 
+                autoPlay
+                className="max-h-full w-full rounded-xl"
+              />
+            </div>
+          ) : isAudio ? (
+            <div className="h-full flex flex-col items-center justify-center p-10 bg-slate-50">
+              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center mb-6 text-blue-600 shadow-inner">
+                <Music size={40} />
+              </div>
+              <h3 className="text-lg font-black text-slate-900 mb-6">{fileName}</h3>
+              <audio 
+                src={authenticatedUrl} 
+                controls 
+                autoPlay
+                className="w-full max-w-md"
+              />
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center p-10 text-center">

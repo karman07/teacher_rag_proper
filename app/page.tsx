@@ -1,8 +1,20 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { GraduationCap, ArrowRight, Bot, Sparkles, BookOpen, ShieldCheck, Zap } from 'lucide-react';
+import { 
+  GraduationCap, 
+  ArrowRight, 
+  Bot, 
+  Sparkles, 
+  BookOpen, 
+  ShieldCheck, 
+  Zap,
+  Binary,
+  FileText,
+  ExternalLink
+} from 'lucide-react';
 import Link from 'next/link';
+import StudentResearch from './components/StudentResearch';
 
 const FEATURES = [
   { icon: <BookOpen size={20} />, title: 'Course Materials', desc: 'Access all your teacher\'s documents in one beautifully organized place.' },
@@ -12,33 +24,29 @@ const FEATURES = [
 
 export default function Home() {
   return (
-    <div className="page-bg min-h-screen overflow-hidden" style={{ color: 'var(--foreground)', background: 'var(--background)' }}>
-
+    <div className="min-h-screen bg-white text-slate-900">
       {/* Navigation */}
-      <nav className="relative z-10 max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      <nav className="relative z-50 max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-            <GraduationCap size={20} strokeWidth={2.5} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-600 text-white shadow-xl shadow-blue-500/20">
+            <GraduationCap size={22} strokeWidth={2.5} />
           </div>
-          <span className="text-xl font-black tracking-tight" style={{ color: 'var(--foreground)' }}>
-            TeachAI <span style={{ color: 'var(--primary)' }}>Student</span>
-          </span>
+          <div className="flex flex-col">
+            <span className="text-lg font-black leading-none tracking-tight">
+              Multimodal <span className="text-blue-600">Student</span>
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-1">Research Project</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
           <Link href="/login">
-            <button className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all" style={{ color: 'black', border: '2px solid var(--primary-light)', background: 'transparent' }}
-              onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary-light)'}
-              onMouseOut={e  => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
-            >
+            <button className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-slate-50 border border-slate-200">
               Sign In
             </button>
           </Link>
           <Link href="/signup">
-            <button className="px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md" style={{ background: 'var(--primary)' }}
-              onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary-dark)'}
-              onMouseOut={e  => (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary)'}
-            >
+            <button className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-white transition-all shadow-xl bg-blue-600 hover:bg-blue-700 shadow-blue-500/20">
               Get Started
             </button>
           </Link>
@@ -46,128 +54,219 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-32">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <main className="relative pt-12">
+        {/* Background Grid */}
+        <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none" />
+        
+        <Container className="relative z-10 pb-32">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-20 items-center">
+            
+            {/* Left Content */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ duration: 0.8 }} 
+              className="space-y-10"
+            >
 
-          {/* Left */}
-          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, ease: [0.22,1,0.36,1] }} className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-              <Sparkles size={14} /> The Future of Learning is Here
-            </div>
+              <h1 className="text-5xl lg:text-7xl font-black leading-[1.05] tracking-tight text-slate-900">
+                Grounded Knowledge 
+                <br />
+                <span className="text-blue-600">Verified Citation.</span>
+              </h1>
 
-            <h1 className="text-5xl md:text-6xl font-black leading-[1.15] tracking-tight">
-              Learn Smarter with{' '}
-              <span style={{ color: 'var(--primary)' }}>AI Guidance.</span>
-            </h1>
+              <p className="text-xl text-slate-600 font-medium leading-relaxed max-w-xl">
+                A high-precision study environment exploring the application of Multimodal RAG 
+                to classroom materials. Engage with verified content with absolute confidence.
+              </p>
 
-            <p className="text-lg leading-relaxed font-medium" style={{ color: 'var(--muted)' }}>
-              Access your classroom materials, view documents instantly, and ask our AI assistant anything — all in one beautiful, distraction-free environment.
-            </p>
+              <div className="flex flex-col sm:flex-row gap-6 pt-4">
+                <Link href="/signup">
+                  <button className="flex items-center justify-center gap-3 w-full sm:w-auto px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.1em] text-white transition-all shadow-2xl bg-blue-600 hover:bg-blue-700 shadow-blue-500/30 hover:-translate-y-0.5">
+                    Access Research Platform <ArrowRight size={18} />
+                  </button>
+                </Link>
 
-            <div className="flex flex-col sm:flex-row gap-5 pt-2">
-              <Link href="/signup">
-                <button className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-white transition-all shadow-lg" style={{ background: 'var(--primary)' }}
-                  onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'}
-                  onMouseOut={e  => (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'}
-                >
-                  Start Learning <ArrowRight size={18} />
-                </button>
-              </Link>
-
-              <div className="flex items-center justify-center gap-8 px-4">
-                {[['10k+', 'Students'], ['24/7', 'AI Support']].map(([val, lbl]) => (
-                  <div key={lbl} className="text-center sm:text-left">
-                    <p className="text-2xl font-black" style={{ color: 'var(--primary)' }}>{val}</p>
-                    <p className="label-caps mt-1">{lbl}</p>
+                <div className="flex items-center gap-8 py-2">
+                  <div>
+                    <p className="text-lg font-black text-slate-900">Qualitative</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">Research Goal</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Right: AI chat mock */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1, delay: 0.2, ease: [0.22,1,0.36,1] }}
-            className="relative flex items-center justify-center"
-          >
-            {/* Main card */}
-            <div className="relative z-10 w-full max-w-md surface-card p-6 shadow-xl border border-slate-200 bg-white">
-              {/* Header */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-                  <Bot size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold">Study Assistant</p>
-                  <p className="label-caps text-emerald-500 mt-0.5 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Online
-                  </p>
+                  <div className="w-px h-10 bg-slate-200" />
+                  <div>
+                    <p className="text-lg font-black text-slate-900">Deterministic</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">Inference Model</p>
+                  </div>
                 </div>
               </div>
-
-              {/* Mock messages */}
-              <div className="space-y-4 mb-6">
-                <div className="px-4 py-3 rounded-2xl bubble-bot text-sm font-medium shadow-sm">
-                  How does photosynthesis work?
-                </div>
-                <div className="px-4 py-3 rounded-2xl bubble-user text-sm font-medium ml-8 shadow-sm">
-                  Photosynthesis converts sunlight, water, and CO₂ into glucose and oxygen using chlorophyll. It occurs in two stages: the light-dependent reactions and the Calvin cycle…
-                </div>
-                <div className="flex gap-2 mt-2 ml-2">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold shadow-sm" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-                    📄 Biology 101.pdf
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'var(--surface-2)', border: '1px solid var(--card-border)' }}>
-                <span className="flex-1 text-sm font-medium" style={{ color: 'var(--muted)' }}>Ask anything…</span>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style={{ background: 'var(--primary)' }}>
-                  <Zap size={16} color="white" />
-                </div>
-              </div>
-            </div>
-
-            {/* Floating badge */}
-            <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-              className="absolute top-8 -right-4 z-20 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg bg-white border border-slate-100"
-            >
-              <Sparkles size={16} style={{ color: 'var(--primary)' }} />
-              <span className="text-xs font-bold" style={{ color: 'var(--primary)' }}>RAG Optimized</span>
             </motion.div>
-          </motion.div>
+
+            {/* Right: Technical Mockup */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, x: 20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              transition={{ duration: 1, delay: 0.2 }}
+              className="relative hidden lg:block"
+            >
+              <div className="relative group">
+                <div className="absolute -inset-10 bg-gradient-to-br from-blue-600/5 via-transparent to-indigo-600/5 rounded-[4rem] blur-3xl opacity-50"></div>
+                
+                <div className="relative rounded-[3.5rem] border border-slate-200 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] overflow-hidden bg-white/90 backdrop-blur-3xl aspect-[1/0.95] flex flex-col group-hover:shadow-[0_48px_80px_-20px_rgba(0,0,0,0.12)] transition-all duration-700">
+                  
+                  {/* Top Bar */}
+                  <div className="h-16 border-b border-slate-100 flex items-center justify-between px-8 bg-white/50">
+                    <div className="flex gap-2">
+                      <div className="w-3 h-3 rounded-full bg-slate-200" />
+                      <div className="w-3 h-3 rounded-full bg-slate-200" />
+                      <div className="w-3 h-3 rounded-full bg-slate-200" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="h-8 px-4 rounded-full bg-blue-50 border border-blue-100/50 flex items-center gap-2"
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Unified Intelligence</span>
+                      </motion.div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex overflow-hidden">
+                    {/* Main Interface Content */}
+                    <div className="flex-1 p-10 flex flex-col gap-8">
+                      
+                      {/* Animated Message Stack */}
+                      <motion.div 
+                        initial="hidden"
+                        animate="visible"
+                        variants={{
+                          hidden: { opacity: 0 },
+                          visible: {
+                            opacity: 1,
+                            transition: { staggerChildren: 0.8 }
+                          }
+                        }}
+                        className="space-y-8"
+                      >
+                        {/* User Question */}
+                        <motion.div 
+                          variants={{
+                            hidden: { opacity: 0, y: 10 },
+                            visible: { opacity: 1, y: 0 }
+                          }}
+                          className="flex justify-end"
+                        >
+                          <div className="bg-blue-50 border border-blue-100 text-blue-900 rounded-2xl rounded-tr-none px-6 py-4 shadow-sm max-w-[85%]">
+                            <p className="text-[13px] font-bold leading-relaxed">
+                              Can you explain the empirical results from page 142?
+                            </p>
+                          </div>
+                        </motion.div>
+
+                        {/* Thinking State */}
+                        <motion.div 
+                          variants={{
+                            hidden: { opacity: 0 },
+                            visible: { 
+                              opacity: 1,
+                              transition: { duration: 0.4 }
+                            }
+                          }}
+                          className="flex gap-3"
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                             <div className="flex gap-1">
+                               <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce" />
+                               <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce [animation-delay:0.2s]" />
+                               <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce [animation-delay:0.4s]" />
+                             </div>
+                          </div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2.5">Retrieving grounding context...</p>
+                        </motion.div>
+
+                        {/* AI Response */}
+                        <motion.div 
+                          variants={{
+                            hidden: { opacity: 0, y: 10 },
+                            visible: { opacity: 1, y: 0 }
+                          }}
+                          transition={{ duration: 0.6 }}
+                          className="flex gap-4 items-start"
+                        >
+                          <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-500/20 shrink-0">
+                            <Sparkles size={18} />
+                          </div>
+                          <div className="flex-1 space-y-5">
+                            <div className="space-y-2">
+                               <p className="text-[13px] font-bold text-slate-900 leading-relaxed px-1">
+                                 According to the research findings on page 142, the model demonstrated a 94.2% increase in deterministic inference accuracy when paired with multi-modal vector grounding.
+                               </p>
+                            </div>
+                            
+                            {/* Citation Chip */}
+                            <motion.div 
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: 2.2 }}
+                              className="inline-flex items-center gap-3 bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm hover:border-blue-200 transition-colors cursor-pointer group/citation"
+                            >
+                               <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-black text-[10px]">
+                                 PDF
+                               </div>
+                               <div>
+                                 <p className="text-[10px] font-black text-slate-900 leading-none mb-0.5">Multimodal_RAG.pdf</p>
+                                 <p className="text-[9px] font-bold text-blue-600 leading-none">Verified Citation: Page 142</p>
+                               </div>
+                               <div className="ml-4 w-6 h-6 rounded-full border border-slate-100 flex items-center justify-center text-slate-300 group-hover/citation:border-blue-200 group-hover/citation:text-blue-600 transition-colors">
+                                 <ExternalLink size={10} />
+                               </div>
+                            </motion.div>
+                          </div>
+                        </motion.div>
+                      </motion.div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Bar Input Mockup */}
+                  <div className="h-24 border-t border-slate-100 bg-slate-50/50 px-10 flex items-center gap-4">
+                    <div className="flex-1 h-14 bg-white border border-slate-200/60 rounded-2xl px-6 flex items-center gap-4 shadow-sm group-hover:border-blue-400/30 transition-all">
+                      <div className="w-2 h-2 rounded-full bg-blue-600" />
+                      <div className="text-[13px] font-bold text-slate-400">Ask the research data...</div>
+                    </div>
+                    <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-500/30">
+                       <ArrowRight size={22} strokeWidth={2.5} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </Container>
+
+        <div className="border-t border-slate-100 bg-slate-50/30">
+          <StudentResearch />
         </div>
-
-        {/* Features row */}
-        <motion.div
-           initial={{ opacity: 0, y: 30 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.8, delay: 0.5 }}
-           className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-28"
-        >
-          {FEATURES.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 + i * 0.1 }}
-              className="surface-card p-8 flex flex-col gap-5 border border-slate-200 bg-white shadow-sm"
-            >
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-                {f.icon}
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2 text-slate-800">{f.title}</h3>
-                <p className="text-sm leading-relaxed font-medium" style={{ color: 'var(--muted)' }}>{f.desc}</p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
       </main>
+
+      {/* Global qualitative footer notice */}
+      <footer className="py-12 border-t border-slate-100">
+        <Container className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-3 opacity-40 grayscale">
+            <img src="https://yt3.googleusercontent.com/btm1_PK-7VRUr9GY2D0UV_2XfbUZPBjghyptjSO1crsfN86HyTYDWPmUbq7JxC3H0Lxe_s067nA=s900-c-k-c0x00ffffff-no-rj" className="h-5 grayscale" alt="NVIDIA" />
+            <div className="h-4 w-px bg-slate-300" />
+            <span className="text-[10px] font-black tracking-[0.2em] uppercase">Compute Collaboration</span>
+          </div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            © 2026 Multimodal RAG Research Initiative
+          </p>
+        </Container>
+      </footer>
     </div>
   );
 }
+
+function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`max-w-7xl mx-auto px-6 ${className}`}>{children}</div>;
+}
+
