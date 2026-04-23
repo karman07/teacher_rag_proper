@@ -8,20 +8,32 @@ export class AnalyticsService {
 
   // ─── Log a query ────────────────────────────────────────────────────────────
   async logQuery(
-    teacherId: string,
+    userId: string, // Can be teacherId or studentId
     question: string,
     answer: string,
     fileId?: string | null,
     askedBy: 'teacher' | 'student' = 'teacher',
     responseMs?: number,
     chunkCount?: number,
-    studentId?: string | null,
+    studentIdOverride?: string | null,
     subjectId?: string | null,
     topic?: string | null,
   ) {
+    let teacherId = askedBy === 'teacher' ? userId : '';
+    let studentId = askedBy === 'student' ? userId : (studentIdOverride ?? null);
+
+    // If student is asking, we need to find the teacherId from the subject
+    if (askedBy === 'student' && subjectId && !teacherId) {
+      const subject = await this.prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { teacherId: true }
+      });
+      if (subject) teacherId = subject.teacherId;
+    }
+
     return this.prisma.queryLog.create({
       data: {
-        teacherId,
+        teacherId: teacherId || 'unknown',
         question,
         answer,
         fileId: fileId ?? null,
@@ -37,12 +49,22 @@ export class AnalyticsService {
 
   // ─── Summary stats ──────────────────────────────────────────────────────────
   async getSummary(teacherId: string, subjectId?: string) {
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(now.getDate() - 14);
+
     const where = { teacherId, ...(subjectId ? { subjectId } : {}) };
+    const currentPeriodWhere = { ...where, createdAt: { gte: sevenDaysAgo } };
+    const previousPeriodWhere = { ...where, createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } };
+
     const [
       totalQueries,
-      teacherQueries,
-      studentQueries,
-      avgResponseMs,
+      currentQueries,
+      previousQueries,
+      currentAvgResponse,
+      previousAvgResponse,
       last7Days,
       topFiles,
       engagement,
@@ -50,10 +72,14 @@ export class AnalyticsService {
       totalTimeData
     ] = await Promise.all([
       this.prisma.queryLog.count({ where }),
-      this.prisma.queryLog.count({ where: { ...where, askedBy: 'teacher' } }),
-      this.prisma.queryLog.count({ where: { ...where, askedBy: 'student' } }),
+      this.prisma.queryLog.count({ where: currentPeriodWhere }),
+      this.prisma.queryLog.count({ where: previousPeriodWhere }),
       this.prisma.queryLog.aggregate({
-        where: { ...where, responseMs: { not: null } },
+        where: { ...currentPeriodWhere, responseMs: { not: null } },
+        _avg: { responseMs: true },
+      }),
+      this.prisma.queryLog.aggregate({
+        where: { ...previousPeriodWhere, responseMs: { not: null } },
         _avg: { responseMs: true },
       }),
       this.getLast7DaysActivity(teacherId, subjectId),
@@ -75,11 +101,23 @@ export class AnalyticsService {
       })
     ]);
 
+    const calculateTrend = (curr: number, prev: number) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return Math.round(((curr - prev) / prev) * 100);
+    };
+
     return {
       totalQueries,
-      teacherQueries,
-      studentQueries,
-      avgResponseMs: Math.round(avgResponseMs._avg.responseMs ?? 0),
+      trends: {
+        queries: calculateTrend(currentQueries, previousQueries),
+        avgResponse: calculateTrend(
+          currentAvgResponse._avg.responseMs ?? 0,
+          previousAvgResponse._avg.responseMs ?? 0
+        ),
+      },
+      teacherQueries: await this.prisma.queryLog.count({ where: { ...where, askedBy: 'teacher' } }),
+      studentQueries: await this.prisma.queryLog.count({ where: { ...where, askedBy: 'student' } }),
+      avgResponseMs: Math.round(currentAvgResponse._avg.responseMs ?? 0),
       last7Days,
       topFiles,
       engagement: {
@@ -287,13 +325,99 @@ export class AnalyticsService {
 
   // ─── Get students joined for a subject ──────────────────────────────────────
   async getSubjectStudents(teacherId: string, subjectId: string) {
-    return this.prisma.enrollment.findMany({
+    const enrollments = await this.prisma.enrollment.findMany({
       where: { subjectId, subject: { teacherId } },
       include: {
-        student: { select: { id: true, name: true, email: true, createdAt: true } }
+        student: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true, 
+            avatarUrl: true,
+            createdAt: true 
+          } 
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    const studentIds = enrollments.map(e => e.studentId);
+    const queryCounts = await this.prisma.queryLog.groupBy({
+      by: ['studentId'],
+      where: { 
+        subjectId, 
+        studentId: { in: studentIds },
+        askedBy: 'student'
+      },
+      _count: { id: true }
+    });
+
+    const countMap = new Map(queryCounts.map(q => [q.studentId, q._count.id]));
+
+    return enrollments.map(e => ({
+      ...e,
+      questionsCount: countMap.get(e.studentId) || 0,
+    }));
+  }
+
+  async getAllTeacherStudents(teacherId: string) {
+    // Get all subjects for this teacher
+    const subjects = await this.prisma.subject.findMany({
+      where: { teacherId },
+      select: { id: true }
+    });
+    const subjectIds = subjects.map(s => s.id);
+
+    // Get unique students from these subjects
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { subjectId: { in: subjectIds } },
+      include: {
+        student: true,
+        subject: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Group by student to aggregate stats
+    const studentMap = new Map<string, any>();
+    
+    // Fetch all query counts for these students in these subjects
+    const studentIds = [...new Set(enrollments.map(e => e.studentId))];
+    const queryCounts = await this.prisma.queryLog.groupBy({
+      by: ['studentId'],
+      where: { 
+        subjectId: { in: subjectIds }, 
+        studentId: { in: studentIds },
+        askedBy: 'student'
+      },
+      _count: { id: true }
+    });
+    const countMap = new Map(queryCounts.map(q => [q.studentId, q._count.id]));
+
+    enrollments.forEach(e => {
+      const existing = studentMap.get(e.studentId);
+      if (!existing) {
+        studentMap.set(e.studentId, {
+          student: e.student,
+          totalTimeSpent: e.totalTimeSpent,
+          questionsCount: countMap.get(e.studentId) || 0,
+          joinedSubjects: [e.subject.name],
+          lastActiveAt: e.lastActiveAt,
+          firstJoinedAt: e.createdAt
+        });
+      } else {
+        existing.totalTimeSpent += e.totalTimeSpent;
+        existing.joinedSubjects.push(e.subject.name);
+        if (new Date(e.lastActiveAt) > new Date(existing.lastActiveAt)) {
+          existing.lastActiveAt = e.lastActiveAt;
+        }
+        if (new Date(e.createdAt) < new Date(existing.firstJoinedAt)) {
+          existing.firstJoinedAt = e.createdAt;
+        }
+      }
+    });
+
+    return [...studentMap.values()];
   }
 
   // ─── Query log list (for the teacher to review) ─────────────────────────────
@@ -315,5 +439,123 @@ export class AnalyticsService {
         student: { select: { name: true } },
       },
     });
+  }
+
+  // ─── Student Personal Analytics ─────────────────────────────────────────────
+  async getStudentPersonalAnalytics(studentId: string, timeframe: '7d' | '30d' | 'all') {
+    const now = new Date();
+    let startDate = new Date();
+
+    if (timeframe === '7d') startDate.setDate(now.getDate() - 7);
+    else if (timeframe === '30d') startDate.setDate(now.getDate() - 30);
+    else startDate.setFullYear(now.getFullYear() - 1); // 1 year
+
+    const [logs, student, timeSpentData, pageViews, activities] = await Promise.all([
+      this.prisma.queryLog.findMany({
+        where: { studentId, createdAt: { gte: startDate } },
+        include: { subject: { select: { name: true } } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.student.findUnique({
+        where: { id: studentId },
+        select: { name: true, email: true, avatarUrl: true, createdAt: true }
+      }),
+      this.prisma.enrollment.aggregate({
+        where: { studentId },
+        _sum: { totalTimeSpent: true }
+      }),
+      this.prisma.activityLog.count({
+        where: { studentId, type: 'page_view', createdAt: { gte: startDate } }
+      }),
+      this.prisma.activityLog.findMany({
+        where: { studentId },
+        take: 10,
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
+
+    // 1. Activity by Bucket
+    const activityMap = new Map<string, number>();
+    const bucketFormat = timeframe === 'all' ? 'MMM' : 'MMM DD';
+    
+    // Initialize buckets
+    const numBuckets = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 12;
+    for (let i = numBuckets - 1; i >= 0; i--) {
+      const d = new Date();
+      if (timeframe === 'all') d.setMonth(now.getMonth() - i);
+      else d.setDate(now.getDate() - i);
+      
+      const key = this.formatDateBucket(d, timeframe);
+      activityMap.set(key, 0);
+    }
+
+    logs.forEach(log => {
+      const key = this.formatDateBucket(log.createdAt, timeframe);
+      if (activityMap.has(key)) {
+        activityMap.set(key, (activityMap.get(key) || 0) + 1);
+      }
+    });
+
+    // 2. Topic Insights
+    const topicMap = new Map<string, { count: number, questions: string[] }>();
+    logs.forEach(log => {
+      const topic = log.topic || 'General';
+      const existing = topicMap.get(topic) || { count: 0, questions: [] };
+      existing.count++;
+      if (existing.questions.length < 3) existing.questions.push(log.question);
+      topicMap.set(topic, existing);
+    });
+
+    const topicInsights = [...topicMap.entries()].map(([topic, data]) => ({
+      topic,
+      count: data.count,
+      percentage: Math.round((data.count / logs.length) * 100),
+      questions: data.questions
+    })).sort((a, b) => b.count - a.count);
+
+    // 3. Subject Breakdown
+    const subjectMap = new Map<string, number>();
+    logs.forEach(log => {
+      const name = log.subject?.name || 'Unknown';
+      subjectMap.set(name, (subjectMap.get(name) || 0) + 1);
+    });
+
+    const subjectBreakdown = [...subjectMap.entries()].map(([subject, count]) => ({
+      subject,
+      count,
+      color: '#2563eb'
+    })).sort((a, b) => b.count - a.count);
+
+    return {
+      student,
+      totalQuestions: logs.length,
+      totalTimeSpent: Math.floor((timeSpentData._sum.totalTimeSpent || 0) / 60), // Convert seconds to minutes
+      totalPageViews: pageViews,
+      recentActivities: activities,
+      activity: [...activityMap.entries()].map(([day, count]) => ({ day, count })),
+      topics: topicInsights,
+      subjects: subjectBreakdown,
+      weakAreas: topicInsights.filter(t => t.count >= 2).slice(0, 3).map(t => ({
+        topic: t.topic,
+        repetitions: t.count,
+        reason: t.count >= 5 ? 'Needs focus' : 'Revisited',
+        questions: t.questions
+      })),
+      recentLogs: logs.slice(-5).reverse().map(l => ({
+        question: l.question,
+        createdAt: l.createdAt,
+        topic: l.topic
+      }))
+    };
+  }
+
+  private formatDateBucket(date: Date, timeframe: string): string {
+    if (timeframe === 'all') {
+      return date.toLocaleDateString('en-US', { month: 'short' });
+    }
+    if (timeframe === '30d') {
+      return `${date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} ${date.getDate()}`;
+    }
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
   }
 }

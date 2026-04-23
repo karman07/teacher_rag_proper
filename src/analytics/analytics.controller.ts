@@ -94,4 +94,27 @@ export class AnalyticsController {
       body.topic,
     );
   }
+
+  @Get('student/personal')
+  async getStudentPersonalAnalytics(
+    @Req() req: any,
+    @Query('timeframe', new DefaultValuePipe('7d')) timeframe: '7d' | '30d' | 'all'
+  ) {
+    // req.user.id is the studentId if called from the student app
+    return this.analyticsService.getStudentPersonalAnalytics(req.user.id, timeframe);
+  }
+
+  @Get('students')
+  async getAllStudents(@Req() req: any) {
+    return this.analyticsService.getAllTeacherStudents(req.user.id);
+  }
+
+  @Get('student-detail/:studentId')
+  async getStudentDetail(
+    @Req() req: any,
+    @Param('studentId') studentId: string,
+    @Query('timeframe', new DefaultValuePipe('all')) timeframe: '7d' | '30d' | 'all'
+  ) {
+    return this.analyticsService.getStudentPersonalAnalytics(studentId, timeframe);
+  }
 }

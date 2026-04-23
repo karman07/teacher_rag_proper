@@ -104,6 +104,19 @@ export class StudentsService {
     return { message: 'Joined successfully!', subject: enrollment.subject };
   }
 
+  async previewClass(classCode: string) {
+    const subject = await this.prisma.subject.findUnique({
+      where: { classCode: classCode.trim().toUpperCase() },
+      include: {
+        teacher: { select: { name: true, avatarUrl: true } },
+        _count: { select: { files: true, enrollments: true } }
+      }
+    });
+
+    if (!subject) throw new NotFoundException('Invalid class code');
+    return subject;
+  }
+
   async getClassDetails(studentId: string, subjectId: string) {
     // 1. Verify enrollment
     const enrollment = await this.prisma.enrollment.findUnique({
@@ -215,6 +228,79 @@ export class StudentsService {
     return this.prisma.note.delete({
       where: { id: noteId }
     });
+  }
+
+  // ─── Chat History ────────────────────────────────────────────────────────────
+
+  async getChatSessions(studentId: string, subjectId: string) {
+    return this.prisma.chatSession.findMany({
+      where: { studentId, subjectId },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'asc' },
+          select: { content: true, createdAt: true },
+        },
+        _count: { select: { messages: true } },
+      },
+    });
+  }
+
+  async createChatSession(studentId: string, subjectId: string, title?: string) {
+    // Verify enrollment
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { studentId_subjectId: { studentId, subjectId } },
+    });
+    if (!enrollment) throw new UnauthorizedException('Not enrolled in this class');
+
+    return this.prisma.chatSession.create({
+      data: { studentId, subjectId, title: title || null },
+    });
+  }
+
+  async getChatMessages(studentId: string, sessionId: string) {
+    const session = await this.prisma.chatSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.studentId !== studentId) throw new UnauthorizedException('Access denied');
+
+    return this.prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async appendChatMessage(studentId: string, sessionId: string, dto: { role: string; content: string; sources?: any[] }) {
+    const session = await this.prisma.chatSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.studentId !== studentId) throw new UnauthorizedException('Access denied');
+
+    const message = await this.prisma.chatMessage.create({
+      data: {
+        sessionId,
+        role: dto.role,
+        content: dto.content,
+        sources: dto.sources ? (dto.sources as any) : undefined,
+      },
+    });
+
+    // Auto-set title from first user message
+    if (!session.title && dto.role === 'user') {
+      const title = dto.content.length > 60 ? dto.content.slice(0, 57) + '…' : dto.content;
+      await this.prisma.chatSession.update({
+        where: { id: sessionId },
+        data: { title, updatedAt: new Date() },
+      });
+    } else {
+      await this.prisma.chatSession.update({ where: { id: sessionId }, data: { updatedAt: new Date() } });
+    }
+
+    return message;
+  }
+
+  async deleteChatSession(studentId: string, sessionId: string) {
+    const session = await this.prisma.chatSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.studentId !== studentId) throw new UnauthorizedException('Access denied');
+    await this.prisma.chatSession.delete({ where: { id: sessionId } });
+    return { message: 'Session deleted' };
   }
 
   private generateToken(student: any) {

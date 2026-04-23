@@ -36,7 +36,7 @@ import {
   FileListQueryDto,
 } from './dto/knowledge-base.dto';
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024; // 1 GB
 
 @ApiTags('knowledge-base')
 @ApiBearerAuth()
@@ -140,7 +140,7 @@ export class KnowledgeBaseController {
   updateFile(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { displayName?: string; tags?: string[]; subjectId?: string | null },
+    @Body() body: { displayName?: string; tags?: string[]; subjectId?: string | null; isAssignment?: boolean },
   ) {
     return this.knowledgeBaseService.updateFileMeta(req.user.id, id, body);
   }

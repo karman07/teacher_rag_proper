@@ -9,7 +9,14 @@ import { AppModule } from './app.module';
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: true,
+  });
+
+  // ── Increase Payload Limits ──────────────────────────────────────────────
+  const express = require('express');
+  app.use(express.json({ limit: '1gb' }));
+  app.use(express.urlencoded({ limit: '1gb', extended: true }));
 
   // ── Global prefix ────────────────────────────────────────────────────────
   app.setGlobalPrefix('api');

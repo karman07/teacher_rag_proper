@@ -27,9 +27,25 @@ const ALLOWED_MIME_TYPES = [
   'text/markdown',
   'text/csv',
   'application/msword',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/tiff',
+  'video/mp4',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/x-matroska',
+  'video/webm',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/aac',
+  'audio/x-m4a',
+  'audio/mp4',
 ];
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.txt', '.md', '.csv', '.doc'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.txt', '.md', '.csv', '.doc', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tif', '.tiff', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.mp3', '.wav', '.aac', '.m4a'];
 
 @Injectable()
 export class KnowledgeBaseService {
@@ -148,7 +164,7 @@ export class KnowledgeBaseService {
       if (subject) collectionName = subject.collectionName;
     }
 
-    this.triggerRagIngestion(dbFile.id, teacherId, collectionName, file.path, file.originalname);
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionName, file.path, file.originalname, dbFile.isAssignment);
 
     return {
       ...dbFile,
@@ -223,7 +239,7 @@ export class KnowledgeBaseService {
       const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
       if (subject) collectionName2 = subject.collectionName;
     }
-    this.triggerRagIngestion(dbFile.id, teacherId, collectionName2, destPath, dto.fileName);
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionName2, destPath, dto.fileName, dbFile.isAssignment);
 
     return {
       ...dbFile,
@@ -280,7 +296,7 @@ export class KnowledgeBaseService {
       const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
       if (subject) collectionName3 = subject.collectionName;
     }
-    this.triggerRagIngestion(dbFile.id, teacherId, collectionName3, destPath, dto.name);
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionName3, destPath, dto.name, dbFile.isAssignment);
 
     return {
       ...dbFile,
@@ -354,7 +370,7 @@ export class KnowledgeBaseService {
       const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
       if (subject) collectionNameS3 = subject.collectionName;
     }
-    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameS3, destPath, path.basename(dto.key));
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameS3, destPath, path.basename(dto.key), dbFile.isAssignment);
 
     return {
       ...dbFile,
@@ -397,7 +413,7 @@ export class KnowledgeBaseService {
   async updateFileMeta(
     teacherId: string,
     fileId: string,
-    data: { displayName?: string; tags?: string[]; subjectId?: string | null },
+    data: { displayName?: string; tags?: string[]; subjectId?: string | null; isAssignment?: boolean },
   ) {
     const file = await this.prisma.knowledgeFile.findUnique({ where: { id: fileId } });
     if (!file) throw new NotFoundException('File not found');
@@ -409,17 +425,18 @@ export class KnowledgeBaseService {
         ...(data.displayName !== undefined && { displayName: data.displayName }),
         ...(data.tags !== undefined && { tags: data.tags }),
         ...(data.subjectId !== undefined && { subjectId: data.subjectId === 'all' ? null : data.subjectId }),
+        ...(data.isAssignment !== undefined && { isAssignment: data.isAssignment }),
       },
     });
 
-    // If subject changed, re-ingest in the new collection
-    if (data.subjectId !== undefined && data.subjectId !== file.subjectId) {
+    // If subject or assignment status changed, re-ingest
+    if ((data.subjectId !== undefined && data.subjectId !== file.subjectId) || (data.isAssignment !== undefined && data.isAssignment !== file.isAssignment)) {
       let collectionName = (await this.ensureKnowledgeBase(teacherId)).collectionName;
       if (data.subjectId && data.subjectId !== 'all') {
         const sub = await this.prisma.subject.findUnique({ where: { id: data.subjectId } });
         if (sub) collectionName = sub.collectionName;
       }
-      this.triggerRagIngestion(file.id, teacherId, collectionName, file.storagePath, file.originalName);
+      this.triggerRagIngestion(updated.id, teacherId, collectionName, updated.storagePath, updated.originalName, updated.isAssignment);
     }
 
     return { ...updated, sizeBytes: Number(updated.sizeBytes) };
@@ -457,6 +474,7 @@ export class KnowledgeBaseService {
     collectionName: string,
     storagePath: string,
     originalName: string,
+    isAssignment: boolean,
   ) {
     try {
       // Mark as processing
@@ -471,7 +489,8 @@ export class KnowledgeBaseService {
         file_id: fileId,
         file_path: storagePath,
         file_name: originalName,
-      }, { timeout: 120_000 }); // 2 min for large files
+        is_assignment: isAssignment,
+      }, { timeout: 600_000 }); // 10 min for large video files
 
       // Mark ready with chunk count
       await this.prisma.knowledgeFile.update({
@@ -504,6 +523,19 @@ export class KnowledgeBaseService {
       '.txt': 'text/plain',
       '.md': 'text/markdown',
       '.csv': 'text/csv',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.tif': 'image/tiff',
+      '.tiff': 'image/tiff',
+      '.mp4': 'video/mp4',
+      '.mov': 'video/quicktime',
+      '.avi': 'video/x-msvideo',
+      '.mkv': 'video/x-matroska',
+      '.webm': 'video/webm',
     };
     return map[ext] ?? 'application/octet-stream';
   }

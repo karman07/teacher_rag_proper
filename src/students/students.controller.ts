@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Request, Param, Response, StreamableFile, NotFoundException, Patch, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, Param, Response, StreamableFile, NotFoundException, Patch, Delete, Query } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -33,6 +33,21 @@ export class StudentsController {
   @Post('join')
   @ApiOperation({ summary: 'Join a classroom using a class code' })
   join(@Request() req: any, @Body('code') code: string) {
+    return this.studentsService.joinClass(req.user.id, code);
+  }
+
+  // ─── Magic Link: preview class before joining ─────────────────────────────
+  @Get('class-preview/:code')
+  @ApiOperation({ summary: 'Preview class info from code (public)' })
+  previewClass(@Param('code') code: string) {
+    return this.studentsService.previewClass(code);
+  }
+
+  // ─── Magic Link: auto-enroll after sign-in ────────────────────────────────
+  @UseGuards(JwtAuthGuard)
+  @Post('join-magic')
+  @ApiOperation({ summary: 'Auto-enroll via invite link after sign-in' })
+  joinMagic(@Request() req: any, @Body('code') code: string) {
     return this.studentsService.joinClass(req.user.id, code);
   }
 
@@ -95,5 +110,51 @@ export class StudentsController {
   @ApiOperation({ summary: 'Delete a note' })
   deleteNote(@Request() req: any, @Param('noteId') noteId: string) {
     return this.studentsService.deleteNote(req.user.id, noteId);
+  }
+
+  // ─── Chat History ────────────────────────────────────────────────────────────
+
+  /** List all chat sessions for a subject */
+  @UseGuards(JwtAuthGuard)
+  @Get('classes/:id/chat-sessions')
+  @ApiOperation({ summary: 'List chat sessions for a class' })
+  getChatSessions(@Request() req: any, @Param('id') id: string) {
+    return this.studentsService.getChatSessions(req.user.id, id);
+  }
+
+  /** Create a new chat session */
+  @UseGuards(JwtAuthGuard)
+  @Post('classes/:id/chat-sessions')
+  @ApiOperation({ summary: 'Create a new chat session' })
+  createChatSession(@Request() req: any, @Param('id') id: string, @Body() dto: { title?: string }) {
+    return this.studentsService.createChatSession(req.user.id, id, dto.title);
+  }
+
+  /** Get all messages in a session */
+  @UseGuards(JwtAuthGuard)
+  @Get('chat-sessions/:sessionId/messages')
+  @ApiOperation({ summary: 'Get messages in a chat session' })
+  getChatMessages(@Request() req: any, @Param('sessionId') sessionId: string) {
+    return this.studentsService.getChatMessages(req.user.id, sessionId);
+  }
+
+  /** Append a message to a session */
+  @UseGuards(JwtAuthGuard)
+  @Post('chat-sessions/:sessionId/messages')
+  @ApiOperation({ summary: 'Append a message to a chat session' })
+  appendChatMessage(
+    @Request() req: any,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: { role: string; content: string; sources?: any[] },
+  ) {
+    return this.studentsService.appendChatMessage(req.user.id, sessionId, dto);
+  }
+
+  /** Delete a chat session */
+  @UseGuards(JwtAuthGuard)
+  @Delete('chat-sessions/:sessionId')
+  @ApiOperation({ summary: 'Delete a chat session' })
+  deleteChatSession(@Request() req: any, @Param('sessionId') sessionId: string) {
+    return this.studentsService.deleteChatSession(req.user.id, sessionId);
   }
 }

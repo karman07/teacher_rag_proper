@@ -64,6 +64,7 @@ model Student {
   queryLogs    QueryLog[]
   activityLogs ActivityLog[]
   notes        Note[]
+  chatSessions ChatSession[]
 
   @@map("students")
 }
@@ -124,6 +125,7 @@ model Subject {
   enrollments    Enrollment[]
   activityLogs   ActivityLog[]
   notes          Note[]
+  chatSessions   ChatSession[]
 
   @@unique([teacherId, name])
   @@map("subjects")
@@ -147,6 +149,7 @@ model KnowledgeFile {
   cloudFileId  String?
   chunkCount   Int        @default(0)
   errorMsg     String?
+  isAssignment Boolean    @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -196,6 +199,37 @@ model Note {
   @@index([studentId, subjectId])
   @@index([fileId])
   @@map("notes")
+}
+
+// ─── CHAT HISTORY ─────────────────────────────────────────────────────────────
+
+model ChatSession {
+  id        String   @id @default(uuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title     String?  // auto-generated from first message
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages  ChatMessage[]
+
+  @@index([studentId, subjectId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id         String      @id @default(uuid())
+  sessionId  String
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role       String      // "user" | "assistant"
+  content    String      @db.Text
+  sources    Json?       // RAGSource[] stored as JSON
+  createdAt  DateTime    @default(now())
+
+  @@index([sessionId])
+  @@map("chat_messages")
 }
 
 // ─── JEWELLERY POS ────────────────────────────────────────────────────────────
