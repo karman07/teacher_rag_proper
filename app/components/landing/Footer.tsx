@@ -59,7 +59,7 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-white dark:bg-[#03070f] border-t border-slate-200 dark:border-slate-800">
+    <footer className="bg-white border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top */}
         <div className="py-16 grid grid-cols-2 md:grid-cols-6 gap-10">
@@ -69,11 +69,11 @@ export default function Footer() {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-500/30">
                 <GraduationCap size={16} className="text-white fill-white" />
               </div>
-              <span className="font-bold text-xl text-slate-900 dark:text-white">
-                Study <span className="text-blue-600 dark:text-blue-400">Assistant</span>
+              <span className="font-bold text-xl text-slate-900">
+                Study <span className="text-blue-600">Assistant</span>
               </span>
             </Link>
-            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mb-6">
+            <p className="text-sm text-slate-500 leading-relaxed max-w-xs mb-6">
               A smarter way to study. Get instant answers from your own course materials—with sources you can trust.
             </p>
             <div className="flex gap-3">
@@ -84,7 +84,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                  className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
                 >
                   <Icon size={16} />
                 </a>
@@ -95,7 +95,7 @@ export default function Footer() {
           {/* Link columns */}
           {Object.entries(FOOTER_LINKS).map(([section, links]) => (
             <div key={section}>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-900 dark:text-white mb-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-900 mb-4">
                 {section}
               </h3>
               <ul className="space-y-3">
@@ -103,7 +103,7 @@ export default function Footer() {
                   <li key={label}>
                     <Link
                       href={href}
-                      className="text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="text-sm text-slate-500 hover:text-blue-600 transition-colors"
                     >
                       {label}
                     </Link>
@@ -115,11 +115,11 @@ export default function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="py-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-slate-400 dark:text-slate-500">
+        <div className="py-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-slate-400">
             &copy; {year} AI Study Assistant. All rights reserved.
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">
+          <p className="text-xs text-slate-400">
             Made to help students learn better.
           </p>
         </div>

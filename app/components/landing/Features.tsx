@@ -21,7 +21,7 @@ const cardVariants = {
 
 export default function Features() {
   return (
-    <section id="features" className="py-24 sm:py-32 bg-white dark:bg-[#03070f] relative z-10 border-t border-slate-100 dark:border-slate-800">
+    <section id="features" className="py-24 sm:py-32 bg-white relative z-10 border-t border-slate-100">
       <Container>
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -34,7 +34,7 @@ export default function Features() {
             title={
               <>
                 Everything you need to{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">succeed.</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">succeed.</span>
               </>
             }
             subtitle="Built from the ground up to help students learn faster and retain more."
@@ -54,7 +54,7 @@ export default function Features() {
               isPressable={false}
               shadow="none"
               classNames={{
-                base: 'group border border-slate-200 dark:border-slate-700/40 hover:border-blue-300/50 dark:hover:border-blue-600/30 transition-all duration-500 bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-800/50 dark:to-blue-900/10 h-full overflow-hidden',
+                base: 'group border border-slate-200 hover:border-blue-300/50 transition-all duration-500 bg-gradient-to-br from-slate-50 to-blue-50/30 h-full overflow-hidden',
                 body: 'p-8 sm:p-12 relative',
               }}
             >
@@ -64,25 +64,25 @@ export default function Features() {
                   <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-8 shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform duration-500">
                     <Brain size={28} />
                   </div>
-                  <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Ask Any Question.<br/>Get Instant Answers.</h3>
-                  <p className="text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                  <h3 className="text-3xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-blue-600 transition-colors">Ask Any Question.<br/>Get Instant Answers.</h3>
+                  <p className="text-base text-slate-600 font-medium leading-relaxed">
                     Like having a tutor available 24/7—based exclusively on your own material. Don't rely on generic internet searches that might be wrong for your specific class.
                   </p>
                 </div>
                 
                 {/* Visual Mockup */}
-                <div className="mt-10 sm:absolute sm:right-[-20px] sm:top-1/2 sm:-translate-y-1/2 w-[300px] sm:w-[400px] bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl p-4 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500 z-10">
+                <div className="mt-10 sm:absolute sm:right-[-20px] sm:top-1/2 sm:-translate-y-1/2 w-[300px] sm:w-[400px] bg-white rounded-2xl border border-slate-200 shadow-xl p-4 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500 z-10">
                   <div className="flex gap-3 items-start mb-4">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 shrink-0" />
-                    <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded-xl w-[80%]" />
+                    <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+                    <div className="h-10 bg-slate-100 rounded-xl w-[80%]" />
                   </div>
                   <div className="flex gap-3 items-start">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 shrink-0 flex items-center justify-center text-blue-600 dark:text-blue-400"><Bot size={16}/></div>
+                    <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-600"><Bot size={16}/></div>
                     <div className="space-y-2 w-full">
-                      <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-full" />
-                      <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-[90%]" />
-                      <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-[60%]" />
-                      <div className="w-24 h-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md mt-2" />
+                      <div className="h-4 bg-slate-100 rounded w-full" />
+                      <div className="h-4 bg-slate-100 rounded w-[90%]" />
+                      <div className="h-4 bg-slate-100 rounded w-[60%]" />
+                      <div className="w-24 h-6 bg-blue-50 border border-blue-100 rounded-md mt-2" />
                     </div>
                   </div>
                 </div>
@@ -96,7 +96,7 @@ export default function Features() {
               isPressable={false}
               shadow="none"
               classNames={{
-                base: 'group border border-slate-200 dark:border-slate-700/40 hover:border-indigo-300/50 dark:hover:border-indigo-600/30 transition-all duration-500 bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800/50 dark:to-slate-800/20 h-full',
+                base: 'group border border-slate-200 hover:border-indigo-300/50 transition-all duration-500 bg-gradient-to-br from-indigo-50 to-white h-full',
                 body: 'p-8 sm:p-12 flex flex-col justify-between relative',
               }}
             >
@@ -105,8 +105,8 @@ export default function Features() {
                   <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mb-8 shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-500">
                     <BookOpen size={28} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-4 tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Everything in One Place</h3>
-                  <p className="text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-indigo-600 transition-colors">Everything in One Place</h3>
+                  <p className="text-base text-slate-600 font-medium leading-relaxed">
                     No more searching through disorganized folders, scattered PDFs, and messy notes. Keep your entire semester organized in one intelligent dashboard.
                   </p>
                 </div>
@@ -120,7 +120,7 @@ export default function Features() {
               isPressable={false}
               shadow="none"
               classNames={{
-                base: 'group border border-slate-200 dark:border-slate-700/40 hover:border-emerald-300/50 dark:hover:border-emerald-600/30 transition-all duration-500 bg-gradient-to-br from-emerald-50 to-white dark:from-slate-800/50 dark:to-slate-800/20 h-full',
+                base: 'group border border-slate-200 hover:border-emerald-300/50 transition-all duration-500 bg-gradient-to-br from-emerald-50 to-white h-full',
                 body: 'p-8 sm:p-12 flex flex-col justify-between relative',
               }}
             >
@@ -129,8 +129,8 @@ export default function Features() {
                   <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mb-8 shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform duration-500">
                     <ShieldCheck size={28} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-4 tracking-tight group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors">Your Data Stays Yours</h3>
-                  <p className="text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-emerald-500 transition-colors">Your Data Stays Yours</h3>
+                  <p className="text-base text-slate-600 font-medium leading-relaxed">
                     Only your classroom content is used to generate answers—nothing else. Your study materials remain completely private and secure.
                   </p>
                 </div>
@@ -144,7 +144,7 @@ export default function Features() {
               isPressable={false}
               shadow="none"
               classNames={{
-                base: 'group transition-all duration-500 bg-slate-900 dark:bg-slate-800 text-white h-full overflow-hidden',
+                base: 'group transition-all duration-500 bg-slate-900 text-white h-full overflow-hidden',
                 body: 'p-8 sm:p-12 flex flex-col sm:flex-row items-center justify-between gap-8 relative',
               }}
             >

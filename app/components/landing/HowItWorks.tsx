@@ -33,7 +33,7 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24 sm:py-32 bg-[#fafcff] dark:bg-[#080f1e] relative z-10">
+    <section id="how-it-works" className="py-24 sm:py-32 bg-[#fafcff] relative z-10">
       <Container>
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -68,20 +68,20 @@ export default function HowItWorks() {
                   >
                     <Icon size={36} className="text-white" />
                   </div>
-                  <div className="absolute -top-3 -right-3 w-9 h-9 bg-white dark:bg-[#03070f] border-2 rounded-xl flex items-center justify-center shadow-sm" style={{ borderColor: COLORS.primary[600] }}>
+                  <div className="absolute -top-3 -right-3 w-9 h-9 bg-white border-2 rounded-xl flex items-center justify-center shadow-sm" style={{ borderColor: COLORS.primary[600] }}>
                     <span className="text-xs font-bold" style={{ color: COLORS.primary[600] }}>{step.step}</span>
                   </div>
                 </div>
 
                 {/* Arrow (mobile only) */}
                 {i < STEPS.length - 1 && (
-                  <div className="lg:hidden mb-8 text-slate-300 dark:text-slate-700">
+                  <div className="lg:hidden mb-8 text-slate-300">
                     <ArrowRight size={24} className="rotate-90" />
                   </div>
                 )}
 
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{step.title}</h3>
-                <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-6 text-[15px] max-w-xs">{step.description}</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-4">{step.title}</h3>
+                <p className="text-slate-600 leading-relaxed mb-6 text-[15px] max-w-xs">{step.description}</p>
 
                 {/* Tag chips */}
                 <div className="flex flex-wrap gap-2 justify-center max-w-xs">
@@ -91,8 +91,8 @@ export default function HowItWorks() {
                       size="sm"
                       variant="bordered"
                       classNames={{
-                        base: 'bg-transparent border-slate-200/60 dark:border-slate-800/60 hover:border-primary/50 transition-colors cursor-default',
-                        content: 'text-slate-600 dark:text-slate-400 font-semibold px-2',
+                        base: 'bg-transparent border-slate-200/60 hover:border-primary/50 transition-colors cursor-default',
+                        content: 'text-slate-600 font-semibold px-2',
                       }}
                       startContent={<div className="w-1 h-1 rounded-full bg-blue-500/40 ml-1" />}
                     >

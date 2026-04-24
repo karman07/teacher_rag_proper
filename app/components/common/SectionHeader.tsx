@@ -36,12 +36,12 @@ export default function SectionHeader({
     >
       <SectionBadge className="mb-5">{badge}</SectionBadge>
 
-      <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-5 leading-tight">
+      <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 mb-5 leading-tight">
         {title}
       </h2>
 
       <p
-        className={`text-xl text-slate-600 dark:text-slate-400 leading-relaxed ${
+        className={`text-xl text-slate-600 leading-relaxed ${
           centered ? `${subtitleMaxWidth} mx-auto` : subtitleMaxWidth
         }`}
       >

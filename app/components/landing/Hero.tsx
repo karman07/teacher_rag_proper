@@ -66,17 +66,17 @@ function HeroMockup() {
         initial={{ rotateX: 5, rotateY: -5 }}
         animate={{ rotateX: 0, rotateY: 0 }}
         transition={{ duration: 1.5, ease: "easeOut" }}
-        className="relative rounded-[2.5rem] border border-white/40 dark:border-white/10 shadow-2xl overflow-hidden bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl flex flex-col transform-gpu"
+        className="relative rounded-[2.5rem] border border-white/40 shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl flex flex-col transform-gpu"
       >
         {/* Browser Top Bar */}
-        <div className="h-14 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-6 bg-white/60 dark:bg-slate-900/60">
+        <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6 bg-white/60">
           <div className="flex gap-2">
             <div className="w-3 h-3 rounded-full bg-red-400" />
             <div className="w-3 h-3 rounded-full bg-amber-400" />
             <div className="w-3 h-3 rounded-full bg-emerald-400" />
           </div>
           <div className="flex-1 px-4">
-            <div className="mx-auto max-w-[240px] h-7 bg-slate-100/80 dark:bg-slate-800/80 rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-500 border border-slate-200/60 dark:border-slate-700/60">
+            <div className="mx-auto max-w-[240px] h-7 bg-slate-100/80 rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-500 border border-slate-200/60">
               <Sparkles size={12} className="text-blue-500 mr-1.5" />
               studyassistant.ai/session
             </div>
@@ -87,7 +87,8 @@ function HeroMockup() {
         <div className="p-8 pb-0 flex-1 min-h-[420px] flex flex-col gap-6">
           <AnimatePresence>
             {step >= 1 && (
-              <motion.div 
+              <motion.div
+                key="hero-user-question"
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="flex justify-end"
@@ -101,11 +102,12 @@ function HeroMockup() {
             )}
 
             {step === 2 && (
-              <motion.div 
+              <motion.div
+                key="hero-thinking-state"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="flex gap-3 items-center"
               >
-                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-blue-600">
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-blue-600">
                   <div className="flex gap-1">
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
@@ -119,7 +121,8 @@ function HeroMockup() {
             )}
 
             {step >= 3 && (
-              <motion.div 
+              <motion.div
+                key="hero-ai-response"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex gap-4 items-start"
@@ -128,8 +131,8 @@ function HeroMockup() {
                   <Bot size={20} />
                 </div>
                 <div className="flex-1 space-y-4">
-                  <div className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-tl-sm p-5 shadow-sm">
-                    <p className="text-[14px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                  <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-sm p-5 shadow-sm">
+                    <p className="text-[14px] font-medium text-slate-700 leading-relaxed">
                       Based on your notes, the main causes were social inequality, unfair taxation on the Third Estate, and the financial crisis worsened by the king's spending.
                     </p>
                   </div>
@@ -139,18 +142,18 @@ function HeroMockup() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.5 }}
-                    className="inline-flex items-center gap-3 bg-white dark:bg-slate-800 border border-blue-100 dark:border-blue-900 p-2.5 rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.08)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)] transition-all cursor-pointer"
+                    className="inline-flex items-center gap-3 bg-white border border-blue-100 p-2.5 rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.08)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)] transition-all cursor-pointer"
                   >
-                    <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 font-black text-[11px]">
+                    <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center text-red-500 font-black text-[11px]">
                       PDF
                     </div>
                     <div>
-                      <p className="text-[12px] font-bold text-slate-900 dark:text-white leading-none mb-1">History_101_Notes.pdf</p>
+                      <p className="text-[12px] font-bold text-slate-900 leading-none mb-1">History_101_Notes.pdf</p>
                       <p className="text-[10px] font-bold text-blue-600 leading-none flex items-center gap-1">
                         <CheckCircle2 size={10} /> Verified Source: Page 4
                       </p>
                     </div>
-                    <div className="ml-2 w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center text-slate-400">
+                    <div className="ml-2 w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
                       <ArrowUpRight size={14} />
                     </div>
                   </motion.div>
@@ -161,8 +164,8 @@ function HeroMockup() {
         </div>
 
         {/* Input Mockup */}
-        <div className="p-6 pt-2 bg-gradient-to-t from-white via-white dark:from-slate-900 dark:via-slate-900 to-transparent">
-          <div className="h-14 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-2xl px-5 flex items-center gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="p-6 pt-2 bg-gradient-to-t from-white via-white to-transparent">
+          <div className="h-14 bg-white border border-slate-200/80 rounded-2xl px-5 flex items-center gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <UploadCloud size={18} className="text-slate-400" />
             <div className="flex-1 text-[13px] font-medium text-slate-400">Ask a follow up question...</div>
             <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
@@ -181,11 +184,11 @@ export default function Hero() {
   const typewriterText = useTypewriter(TYPEWRITER_WORDS);
 
   return (
-    <section className="relative min-h-[85vh] flex items-center overflow-hidden bg-white dark:bg-[#03070f] pt-8">
+    <section className="relative min-h-[85vh] flex items-center overflow-hidden bg-white pt-8">
       {/* Grid + glow backgrounds */}
-      <div className="absolute inset-0 grid-bg opacity-60 dark:opacity-100" />
-      <div className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full bg-blue-500/[0.04] dark:bg-blue-600/[0.08] blur-[120px] -translate-y-1/3 translate-x-1/3 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-blue-400/[0.04] dark:bg-blue-600/[0.06] blur-[100px] translate-y-1/3 -translate-x-1/3 pointer-events-none" />
+      <div className="absolute inset-0 grid-bg opacity-60" />
+      <div className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full bg-blue-500/[0.04] blur-[120px] -translate-y-1/3 translate-x-1/3 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-blue-400/[0.04] blur-[100px] translate-y-1/3 -translate-x-1/3 pointer-events-none" />
 
       <Container className="relative z-10 py-12 w-full">
         <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center">
@@ -198,13 +201,13 @@ export default function Hero() {
             className="flex flex-col gap-8 max-w-[640px] min-w-0"
           >
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-400 text-xs font-bold tracking-wide w-fit">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-bold tracking-wide w-fit">
               <Sparkles size={14} /> The #1 AI Study Tool for Students
             </div>
 
             {/* Headline */}
             <div>
-              <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900 dark:text-white">
+              <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900">
                 Study Smarter,
               </h1>
               {/* Typewriter line — fixed height prevents layout shift */}
@@ -214,16 +217,16 @@ export default function Hero() {
                 </div>
                 
                 <h1
-                  className="absolute top-0 left-0 text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] font-bold leading-[1.1] tracking-tight text-blue-600 dark:text-blue-400 whitespace-nowrap"
+                  className="absolute top-0 left-0 text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] font-bold leading-[1.1] tracking-tight text-blue-600 whitespace-nowrap"
                 >
                   {typewriterText}
-                  <span className="inline-block w-[3px] h-9 lg:h-14 bg-blue-600 dark:bg-blue-400 ml-1 align-middle cursor-blink" />
+                  <span className="inline-block w-[3px] h-9 lg:h-14 bg-blue-600 ml-1 align-middle cursor-blink" />
                 </h1>
               </div>
             </div>
 
             {/* Sub-headline */}
-            <p className="text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-[520px]">
+            <p className="text-xl text-slate-600 leading-relaxed max-w-[520px]">
               Get instant answers from your own course materials—with sources you can trust. Upload your notes, PDFs, or textbooks. Ask questions anytime. Get clear answers backed by your actual study material.
             </p>
 
@@ -242,18 +245,18 @@ export default function Hero() {
               </Button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 pt-6 border-t border-slate-200/60">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={12} strokeWidth={3} /></div>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Free to use</span>
+                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><CheckCircle2 size={12} strokeWidth={3} /></div>
+                <span className="text-sm font-bold text-slate-700">Free to use</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400"><FileText size={12} strokeWidth={3} /></div>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Works with notes & PDFs</span>
+                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><FileText size={12} strokeWidth={3} /></div>
+                <span className="text-sm font-bold text-slate-700">Works with notes & PDFs</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400"><Clock size={12} strokeWidth={3} /></div>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Takes 2 mins to start</span>
+                <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><Clock size={12} strokeWidth={3} /></div>
+                <span className="text-sm font-bold text-slate-700">Takes 2 mins to start</span>
               </div>
             </div>
 

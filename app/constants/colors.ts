@@ -23,17 +23,6 @@ export const COLORS = {
     textMuted:    '#94a3b8',
   },
 
-  // Dark mode surfaces
-  dark: {
-    bg:           '#020812',   // page canvas
-    bgAlt:        '#080f1e',
-    bgCard:       '#0d1424',   // sidebar + cards + panels
-    border:       '#1e293b',
-    textPrimary:  '#f1f5f9',
-    textSecondary:'#94a3b8',
-    textMuted:    '#475569',
-  },
-
   // Semantic accent colors
   accent: {
     blue:    '#3b82f6',
@@ -46,12 +35,9 @@ export const COLORS = {
   // Nav item tokens
   nav: {
     activeBgLight:   '#eff6ff',   // primary-50
-    activeBgDark:    'rgba(37,99,235,0.15)',
     activeTextLight: '#2563eb',   // primary-600
-    activeTextDark:  '#60a5fa',   // primary-400
     activeBorder:    '#3b82f6',   // primary-500
     hoverBgLight:    '#f8fafc',   // slate-50
-    hoverBgDark:     'rgba(255,255,255,0.06)',
   },
 } as const;
 

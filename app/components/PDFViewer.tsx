@@ -37,9 +37,9 @@ export default function PDFViewer({ url, fileName, mimeType = 'application/pdf' 
   }, [zoomPluginInstance]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner">
+    <div className="flex flex-col h-full bg-slate-50 rounded-3xl overflow-hidden border border-slate-200 shadow-inner">
       {/* PDF Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-10">
+      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200 z-10">
         <div className="flex items-center gap-2">
             <div className="bg-primary/10 p-1.5 rounded-lg text-primary">
                 {mimeType.includes('video') ? <Video size={16} /> : 
@@ -67,7 +67,7 @@ export default function PDFViewer({ url, fileName, mimeType = 'application/pdf' 
       </div>
 
       {/* PDF Content */}
-      <div className="flex-1 overflow-auto p-4 flex justify-center scrollbar-hide bg-slate-100 dark:bg-slate-950/50 relative">
+      <div className="flex-1 overflow-auto p-4 flex justify-center scrollbar-hide bg-slate-100 relative">
         {mimeType.includes('image') ? (
             <img src={url} alt={fileName} className="max-w-full rounded-2xl shadow-2xl" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
         ) : mimeType.includes('video') ? (

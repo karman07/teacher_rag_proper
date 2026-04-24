@@ -48,14 +48,14 @@ const cardVariants = {
 
 export default function Testimonials() {
   return (
-    <section id="testimonials" className="py-24 bg-white dark:bg-[#03070f] border-y border-slate-100 dark:border-slate-800">
+    <section id="testimonials" className="py-24 bg-white border-y border-slate-100">
       <Container>
         <SectionHeader
           badge="Testimonials"
           title={
             <>
               Used by students across{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">every major</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">every major</span>
             </>
           }
           subtitle="Hear how Study Assistant is saving students hours each week while improving their grades."
@@ -73,7 +73,7 @@ export default function Testimonials() {
               <Card
                 shadow="none"
                 classNames={{
-                  base: 'h-full border border-slate-200/80 dark:border-slate-700/40 bg-[#fafcff] dark:bg-slate-800/50 hover:border-blue-300/50 dark:hover:border-blue-500/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300',
+                  base: 'h-full border border-slate-200/80 bg-[#fafcff] hover:border-blue-300/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300',
                 }}
               >
                 <CardBody className="p-8 flex flex-col gap-6">
@@ -92,25 +92,25 @@ export default function Testimonials() {
                   <div className="relative flex-1">
                     <Quote
                       size={28}
-                      className="text-blue-200 dark:text-blue-800/60 mb-2"
+                      className="text-blue-200 mb-2"
                     />
-                    <p className="text-slate-700 dark:text-slate-300 text-lg font-semibold leading-relaxed">
+                    <p className="text-slate-700 text-lg font-semibold leading-relaxed">
                       "{t.content}"
                     </p>
                   </div>
 
                   {/* Author */}
-                  <div className="flex items-center gap-3 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                  <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
                     <div
                       className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.color} flex items-center justify-center shrink-0`}
                     >
                       <span className="text-sm font-bold text-white">{t.avatar}</span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      <p className="text-sm font-bold text-slate-900 truncate">
                         {t.name}
                       </p>
-                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+                      <p className="text-xs font-medium text-slate-500 truncate">
                         {t.course}
                       </p>
                     </div>

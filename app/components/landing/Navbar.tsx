@@ -14,17 +14,13 @@ import {
   NavbarMenuItem,
   Tooltip
 } from '@heroui/react';
-import { GraduationCap, Sun, Moon, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
-import { COLORS } from '../../constants/colors';
-import { useTheme } from '../../context/ThemeContext';
+import { GraduationCap, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export default function AppNavbar() {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const pathname = usePathname();
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === 'dark';
   const { user, logout, isLoading } = useAuth();
 
   const menuItems = [
@@ -38,7 +34,7 @@ export default function AppNavbar() {
       onMenuOpenChange={setIsMenuOpen} 
       maxWidth="xl" 
       position="sticky"
-      className="bg-white/80 dark:bg-[#020812]/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 h-20"
+      className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 h-20"
       classNames={{
         wrapper: "px-6 sm:px-12",
       }}
@@ -47,7 +43,7 @@ export default function AppNavbar() {
       <NavbarContent justify="start">
         <NavbarMenuToggle
           aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-          className="sm:hidden text-slate-600 dark:text-slate-400"
+          className="sm:hidden text-slate-600"
         />
         <NavbarBrand className="gap-3">
           <Link href="/" className="flex items-center gap-3 group">
@@ -58,10 +54,10 @@ export default function AppNavbar() {
               </div>
             </div>
             <div className="flex flex-col -gap-1">
-              <p className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight flex items-baseline">
-                Study <span className="text-blue-600 dark:text-blue-400 font-black ml-1">Assistant</span>
+              <p className="font-extrabold text-xl text-slate-900 tracking-tight flex items-baseline">
+                Study <span className="text-blue-600 font-black ml-1">Assistant</span>
               </p>
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] leading-none">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">
                 AI For Your Courses
               </span>
             </div>
@@ -77,8 +73,8 @@ export default function AppNavbar() {
             <NavbarItem key={item.label} className="relative">
               <Link 
                 href={item.href}
-                className={`text-sm font-semibold tracking-wide transition-all duration-200 hover:text-blue-600 dark:hover:text-blue-400 ${
-                  isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'
+                className={`text-sm font-semibold tracking-wide transition-all duration-200 hover:text-blue-600 ${
+                  isActive ? 'text-blue-600' : 'text-slate-500'
                 }`}
               >
                 {item.label}
@@ -86,7 +82,7 @@ export default function AppNavbar() {
               {isActive && (
                 <motion.div 
                   layoutId="nav-underline"
-                  className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full"
+                  className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 rounded-full"
                 />
               )}
             </NavbarItem>
@@ -96,40 +92,6 @@ export default function AppNavbar() {
 
       {/* -- Actions ------------------------------------------------------------- */}
       <NavbarContent justify="end" className="gap-3 sm:gap-5">
-        <NavbarItem>
-          <Button
-            isIconOnly
-            variant="light"
-            onClick={toggleTheme}
-            className="w-10 h-10 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            aria-label="Toggle theme"
-          >
-            <AnimatePresence mode="wait">
-              {isDark ? (
-                <motion.div
-                  key="sun"
-                  initial={{ rotate: -90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 90, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Sun size={20} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="moon"
-                  initial={{ rotate: 90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: -90, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Moon size={20} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Button>
-        </NavbarItem>
-
         {!isLoading && (
           <>
             {user ? (
@@ -149,7 +111,7 @@ export default function AppNavbar() {
                     isIconOnly
                     variant="flat"
                     onClick={logout}
-                    className="w-10 h-10 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all border border-transparent hover:border-red-200 dark:hover:border-red-900/50"
+                    className="w-10 h-10 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-200"
                   >
                     <LogOut size={18} />
                   </Button>
@@ -163,7 +125,7 @@ export default function AppNavbar() {
                       as={Link} 
                       href="/login" 
                       variant="light" 
-                      className="font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 h-11 rounded-2xl"
+                      className="font-bold text-slate-600 hover:bg-slate-100 h-11 rounded-2xl"
                     >
                       Sign In
                     </Button>
@@ -188,11 +150,11 @@ export default function AppNavbar() {
       </NavbarContent>
 
       {/* -- Mobile Menu --------------------------------------------------------- */}
-      <NavbarMenu className="bg-white/90 dark:bg-[#020812]/90 backdrop-blur-2xl pt-10 px-8 gap-4 border-t border-slate-200 dark:border-slate-800">
+      <NavbarMenu className="bg-white/90 backdrop-blur-2xl pt-10 px-8 gap-4 border-t border-slate-200">
         {user && (
           <NavbarMenuItem>
             <Link
-              className="group flex items-center justify-between w-full p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-lg font-bold transition-all"
+              className="group flex items-center justify-between w-full p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 text-lg font-bold transition-all"
               href="/dashboard"
               onClick={() => setIsMenuOpen(false)}
             >
@@ -209,7 +171,7 @@ export default function AppNavbar() {
           {menuItems.map((item, index) => (
             <NavbarMenuItem key={`${item.label}-${index}`}>
               <Link
-                className="flex items-center justify-between w-full px-4 py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-lg font-semibold transition-all"
+                className="flex items-center justify-between w-full px-4 py-3 rounded-xl hover:bg-slate-100 text-slate-700 text-lg font-semibold transition-all"
                 href={item.href}
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -225,7 +187,7 @@ export default function AppNavbar() {
             <Button
               onClick={logout}
               variant="flat"
-              className="w-full h-14 rounded-2xl bg-red-50 dark:bg-red-950/20 text-red-500 dark:text-red-400 text-lg font-bold gap-3"
+              className="w-full h-14 rounded-2xl bg-red-50 text-red-500 text-lg font-bold gap-3"
             >
               <LogOut size={22} />
               Sign Out

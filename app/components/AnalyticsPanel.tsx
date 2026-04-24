@@ -310,7 +310,13 @@ export default function AnalyticsPanel() {
           </div>
           <div className="space-y-3">
             {topics.slice(0, 5).map((t, i) => (
-              <TopicBar key={t.topic} topic={t.topic} count={t.count} percentage={t.percentage} rank={i} />
+              <TopicBar
+                key={`${t.topic?.trim() || 'untitled-topic'}-${t.count}-${i}`}
+                topic={t.topic?.trim() || 'Untitled Topic'}
+                count={t.count}
+                percentage={t.percentage}
+                rank={i}
+              />
             ))}
             {topics.length === 0 && (
               <p className="text-xs text-slate-400 font-bold py-10 text-center uppercase tracking-widest">No focus areas identified yet</p>
@@ -332,7 +338,11 @@ export default function AnalyticsPanel() {
           {weakAreas.length > 0 ? (
             <div className="space-y-4">
               {weakAreas.map((area, i) => (
-                <WeakAreaCard key={area.topic} area={area} index={i} />
+                <WeakAreaCard
+                  key={`${area.topic?.trim() || 'untitled-weak-area'}-${area.repetitions ?? 0}-${i}`}
+                  area={{ ...area, topic: area.topic?.trim() || 'Untitled Topic' }}
+                  index={i}
+                />
               ))}
               
               <div className="mt-4 p-5 rounded-2xl bg-slate-900 border border-slate-800 flex items-start gap-4">
