@@ -200,12 +200,12 @@ export default function Hero() {
               {/* Typewriter line — fixed height prevents layout shift */}
               <div className="mt-2 min-h-[4rem] lg:min-h-[5.5rem] relative flex items-start">
                 {/* Invisible spacer to lock width and prevent layout shift during typing */}
-                <div className="invisible h-0 font-bold text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] leading-[1.1] tracking-tight whitespace-nowrap pointer-events-none select-none">
+                <div className="invisible font-bold text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] leading-[1.1] tracking-tight pointer-events-none select-none">
                   Interactive Course Insights
                 </div>
                 
                 <h1
-                  className="absolute top-0 left-0 text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] font-bold leading-[1.1] tracking-tight text-blue-600 dark:text-blue-400 whitespace-nowrap"
+                  className="absolute top-0 left-0 text-4xl sm:text-5xl lg:text-6xl xl:text-[4.2rem] font-bold leading-[1.1] tracking-tight text-blue-600 dark:text-blue-400"
                 >
                   {typewriterText}
                   <span className="inline-block w-[3px] h-9 lg:h-14 bg-blue-600 dark:bg-blue-400 ml-1 align-middle cursor-blink" />
