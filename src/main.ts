@@ -13,6 +13,8 @@ async function bootstrap() {
     bodyParser: true,
   });
 
+  app.enableShutdownHooks();
+
   // ── Increase Payload Limits ──────────────────────────────────────────────
   const express = require('express');
   app.use(express.json({ limit: '1gb' }));

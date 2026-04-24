@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // ─── Log a query ────────────────────────────────────────────────────────────
   async logQuery(
@@ -85,15 +85,15 @@ export class AnalyticsService {
       this.getLast7DaysActivity(teacherId, subjectId),
       this.getTopQueriedFiles(teacherId, 5, subjectId),
       this.getStudentEngagement(teacherId, subjectId),
-      this.prisma.activityLog.count({ 
-        where: { 
-          subject: { teacherId }, 
+      this.prisma.activityLog.count({
+        where: {
+          subject: { teacherId },
           type: 'page_view',
           ...(subjectId ? { subjectId } : {})
-        } 
+        }
       }),
       this.prisma.enrollment.aggregate({
-        where: { 
+        where: {
           subject: { teacherId },
           ...(subjectId ? { subjectId } : {})
         },
@@ -163,8 +163,8 @@ export class AnalyticsService {
     sevenDaysAgo.setHours(0, 0, 0, 0);
 
     const logs = await this.prisma.queryLog.findMany({
-      where: { 
-        teacherId, 
+      where: {
+        teacherId,
         createdAt: { gte: sevenDaysAgo },
         ...(subjectId ? { subjectId } : {})
       },
@@ -200,8 +200,8 @@ export class AnalyticsService {
   private async getTopQueriedFiles(teacherId: string, limit = 5, subjectId?: string) {
     const grouped = await this.prisma.queryLog.groupBy({
       by: ['fileId'],
-      where: { 
-        teacherId, 
+      where: {
+        teacherId,
         fileId: { not: null },
         ...(subjectId ? { subjectId } : {})
       },
@@ -220,8 +220,8 @@ export class AnalyticsService {
     const fileMap = new Map(files.map((f) => [f.id, f]));
 
     return grouped.map((g) => ({
-      fileId:   g.fileId,
-      count:    g._count.id,
+      fileId: g.fileId,
+      count: g._count.id,
       fileName: fileMap.get(g.fileId!)?.displayName || fileMap.get(g.fileId!)?.originalName || 'Unknown',
     }));
   }
@@ -230,8 +230,8 @@ export class AnalyticsService {
   async getTopicDistribution(teacherId: string, subjectId?: string) {
     const grouped = await this.prisma.queryLog.groupBy({
       by: ['topic'],
-      where: { 
-        teacherId, 
+      where: {
+        teacherId,
         topic: { not: null },
         ...(subjectId ? { subjectId } : {})
       },
@@ -245,15 +245,15 @@ export class AnalyticsService {
   // ─── Student Engagement ──────────────────────────────────────────────────────
   async getStudentEngagement(teacherId: string, subjectId?: string) {
     const [totalStudents, activeStudents] = await Promise.all([
-      subjectId 
+      subjectId
         ? this.prisma.enrollment.count({ where: { subjectId } })
         : this.prisma.enrollment.count({ where: { subject: { teacherId } } }),
-      
+
       this.prisma.queryLog.groupBy({
         by: ['studentId'],
-        where: { 
-          teacherId, 
-          askedBy: 'student', 
+        where: {
+          teacherId,
+          askedBy: 'student',
           studentId: { not: null },
           ...(subjectId ? { subjectId } : {})
         },
@@ -264,7 +264,7 @@ export class AnalyticsService {
     return {
       joined: totalStudents,
       active: activeStudents.length, // students who asked at least 1 question
-      queriesPerStudent: activeStudents.length > 0 
+      queriesPerStudent: activeStudents.length > 0
         ? activeStudents.reduce((acc, curr) => acc + curr._count.id, 0) / activeStudents.length
         : 0
     };
@@ -287,7 +287,7 @@ export class AnalyticsService {
       select: { question: true },
       take: 200,
     });
-    
+
     const counts = new Map<string, number>();
     for (const log of logs) {
       const q = log.question.trim().toLowerCase();
@@ -306,7 +306,7 @@ export class AnalyticsService {
       // Update the total time spent in Enrollment
       await this.prisma.enrollment.update({
         where: { studentId_subjectId: { studentId, subjectId } },
-        data: { 
+        data: {
           totalTimeSpent: { increment: metadata.duration },
           lastActiveAt: new Date()
         }
@@ -328,14 +328,14 @@ export class AnalyticsService {
     const enrollments = await this.prisma.enrollment.findMany({
       where: { subjectId, subject: { teacherId } },
       include: {
-        student: { 
-          select: { 
-            id: true, 
-            name: true, 
-            email: true, 
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
             avatarUrl: true,
-            createdAt: true 
-          } 
+            createdAt: true
+          }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -344,8 +344,8 @@ export class AnalyticsService {
     const studentIds = enrollments.map(e => e.studentId);
     const queryCounts = await this.prisma.queryLog.groupBy({
       by: ['studentId'],
-      where: { 
-        subjectId, 
+      where: {
+        subjectId,
         studentId: { in: studentIds },
         askedBy: 'student'
       },
@@ -380,13 +380,13 @@ export class AnalyticsService {
 
     // Group by student to aggregate stats
     const studentMap = new Map<string, any>();
-    
+
     // Fetch all query counts for these students in these subjects
     const studentIds = [...new Set(enrollments.map(e => e.studentId))];
     const queryCounts = await this.prisma.queryLog.groupBy({
       by: ['studentId'],
-      where: { 
-        subjectId: { in: subjectIds }, 
+      where: {
+        subjectId: { in: subjectIds },
         studentId: { in: studentIds },
         askedBy: 'student'
       },
@@ -453,7 +453,10 @@ export class AnalyticsService {
     const [logs, student, timeSpentData, pageViews, activities] = await Promise.all([
       this.prisma.queryLog.findMany({
         where: { studentId, createdAt: { gte: startDate } },
-        include: { subject: { select: { name: true } } },
+        include: {
+          subject: { select: { name: true } },
+          file: { select: { displayName: true, originalName: true } }
+        },
         orderBy: { createdAt: 'asc' },
       }),
       this.prisma.student.findUnique({
@@ -477,14 +480,14 @@ export class AnalyticsService {
     // 1. Activity by Bucket
     const activityMap = new Map<string, number>();
     const bucketFormat = timeframe === 'all' ? 'MMM' : 'MMM DD';
-    
+
     // Initialize buckets
     const numBuckets = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 12;
     for (let i = numBuckets - 1; i >= 0; i--) {
       const d = new Date();
       if (timeframe === 'all') d.setMonth(now.getMonth() - i);
       else d.setDate(now.getDate() - i);
-      
+
       const key = this.formatDateBucket(d, timeframe);
       activityMap.set(key, 0);
     }
@@ -496,35 +499,88 @@ export class AnalyticsService {
       }
     });
 
-    // 2. Topic Insights
-    const topicMap = new Map<string, { count: number, questions: string[] }>();
+    // 2. Topic Insights & Weak Area Detection
+    const topicMap = new Map<string, { count: number, questions: string[], lastAskedAt: Date, struggleScore: number, confusionCount: number }>();
+    const CONFUSION_KEYWORDS = ["don't understand", 'confused', 'explain', 'meaning', 'help', 'not clear', 'stuck', 'why'];
+
     logs.forEach(log => {
-      const topic = log.topic || 'General';
-      const existing = topicMap.get(topic) || { count: 0, questions: [] };
+      // Use granular file-based topic if available
+      let topicName = log.topic || 'General';
+      if (log.file) {
+        topicName = log.file.displayName || log.file.originalName || topicName;
+      }
+
+      const existing = topicMap.get(topicName) || { count: 0, questions: [], lastAskedAt: new Date(0), struggleScore: 0, confusionCount: 0 };
       existing.count++;
       if (existing.questions.length < 3) existing.questions.push(log.question);
-      topicMap.set(topic, existing);
+
+      // Struggle Score logic
+      const qLower = log.question.toLowerCase();
+      let hasConfusion = false;
+      if (CONFUSION_KEYWORDS.some(kw => qLower.includes(kw))) {
+        existing.struggleScore += 2;
+        existing.confusionCount++;
+        hasConfusion = true;
+      }
+
+      // Time density: if asked within 5 minutes of the last question on this topic
+      if (existing.lastAskedAt.getTime() > 0) {
+        const timeDiffMins = (log.createdAt.getTime() - existing.lastAskedAt.getTime()) / (1000 * 60);
+        if (timeDiffMins < 5) {
+          existing.struggleScore += 1;
+        }
+      }
+
+      existing.lastAskedAt = log.createdAt;
+      topicMap.set(topicName, existing);
     });
 
     const topicInsights = [...topicMap.entries()].map(([topic, data]) => ({
       topic,
       count: data.count,
-      percentage: Math.round((data.count / logs.length) * 100),
-      questions: data.questions
+      percentage: Math.round((data.count / logs.length) * 100) || 0,
+      questions: data.questions,
+      struggleScore: data.struggleScore,
+      confusionCount: data.confusionCount
     })).sort((a, b) => b.count - a.count);
 
-    // 3. Subject Breakdown
+    // 3. Subject Breakdown with Dynamic Colors
     const subjectMap = new Map<string, number>();
     logs.forEach(log => {
       const name = log.subject?.name || 'Unknown';
       subjectMap.set(name, (subjectMap.get(name) || 0) + 1);
     });
 
-    const subjectBreakdown = [...subjectMap.entries()].map(([subject, count]) => ({
+    const COLOR_PALETTE = ['#2563eb', '#7c3aed', '#0d9488', '#d97706', '#dc2626', '#0284c7', '#ea580c'];
+
+    const subjectBreakdown = [...subjectMap.entries()].map(([subject, count], idx) => ({
       subject,
       count,
-      color: '#2563eb'
+      color: COLOR_PALETTE[idx % COLOR_PALETTE.length]
     })).sort((a, b) => b.count - a.count);
+
+    // Weak Areas: based on struggle score, defaulting to high counts if no explicit struggle
+    const weakAreas = topicInsights
+      .filter(t => t.struggleScore > 0 || t.count >= 3)
+      .sort((a, b) => (b.struggleScore * 2 + b.count) - (a.struggleScore * 2 + a.count))
+      .slice(0, 3)
+      .map(t => {
+        let reason = 'Revisited multiple times';
+        if (t.confusionCount > 0) {
+          reason = `Expressed confusion in ${t.confusionCount} query/queries`;
+        } else if (t.struggleScore > 0) {
+          reason = 'High density of questions in a short time';
+        } else if (t.count >= 5) {
+          reason = 'Needs focus - highly queried area';
+        }
+
+        return {
+          topic: t.topic,
+          repetitions: t.count,
+          reason,
+          questions: t.questions
+        };
+      });
 
     return {
       student,
@@ -535,12 +591,7 @@ export class AnalyticsService {
       activity: [...activityMap.entries()].map(([day, count]) => ({ day, count })),
       topics: topicInsights,
       subjects: subjectBreakdown,
-      weakAreas: topicInsights.filter(t => t.count >= 2).slice(0, 3).map(t => ({
-        topic: t.topic,
-        repetitions: t.count,
-        reason: t.count >= 5 ? 'Needs focus' : 'Revisited',
-        questions: t.questions
-      })),
+      weakAreas,
       recentLogs: logs.slice(-5).reverse().map(l => ({
         question: l.question,
         createdAt: l.createdAt,
