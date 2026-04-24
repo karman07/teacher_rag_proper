@@ -41,6 +41,7 @@ export const COLORS = {
     amber:   '#f59e0b',
     emerald: '#10b981',
     rose:    '#f43f5e',
+    violet:  '#8b5cf6',
   },
 
   // Nav item tokens

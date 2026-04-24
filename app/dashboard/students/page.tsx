@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardBody, Button, Input, Skeleton, Avatar, Chip } from '@heroui/react';
@@ -12,7 +12,7 @@ import {
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
 import { analyticsApi } from '../../lib/analyticsApi';
 
-export default function StudentsPage() {
+function StudentsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subjectFilter = searchParams.get('subject');
@@ -178,5 +178,19 @@ export default function StudentsPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function StudentsPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+      </DashboardLayout>
+    }>
+      <StudentsPageContent />
+    </Suspense>
   );
 }
