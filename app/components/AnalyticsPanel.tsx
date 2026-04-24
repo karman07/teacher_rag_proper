@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import {
   TrendingUp, Brain, BarChart2, Target,
   MessageSquare, ChevronDown, Lightbulb, Activity, Bot, Sparkles,
+  Clock, BookOpen
 } from 'lucide-react';
 import {
   TopicInsight, WeakArea,
@@ -184,6 +185,8 @@ export default function AnalyticsPanel() {
   const [activity, setActivity] = useState<{ day: string; count: number }[]>([]);
   const [subjects, setSubjects] = useState<{ subject: string; count: number; color: string }[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(0);
+  const [totalTimeSpent, setTotalTimeSpent] = useState(0);
+  const [totalPageViews, setTotalPageViews] = useState(0);
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('7d');
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -202,6 +205,8 @@ export default function AnalyticsPanel() {
         setActivity(data.activity || []);
         setSubjects(data.subjects || []);
         setTotalQuestions(data.totalQuestions || 0);
+        setTotalTimeSpent(data.totalTimeSpent || 0);
+        setTotalPageViews(data.totalPageViews || 0);
     } catch (e) {
         console.error('Failed to fetch analytics:', e);
     } finally {
@@ -211,7 +216,7 @@ export default function AnalyticsPanel() {
 
   if (!mounted) return null;
 
-  const hasData = totalQuestions > 0 || loading;
+  const hasData = totalQuestions > 0 || totalTimeSpent > 0 || totalPageViews > 0 || loading;
 
   if (!hasData) {
     return (
@@ -257,6 +262,31 @@ export default function AnalyticsPanel() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Row 0: KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[
+          { label: 'Study Time', value: `${totalTimeSpent} min`, icon: <Clock size={20} />, bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' },
+          { label: 'Materials Read', value: totalPageViews, icon: <BookOpen size={20} />, bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100' },
+          { label: 'AI Interactions', value: totalQuestions, icon: <MessageSquare size={20} />, bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
+        ].map((kpi, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className={`p-6 rounded-[2rem] border ${kpi.border} bg-white shadow-sm flex items-center gap-5`}
+          >
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${kpi.bg} ${kpi.text} shadow-inner`}>
+              {kpi.icon}
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-500 uppercase tracking-tight">{kpi.label}</p>
+              <p className="text-3xl font-black text-slate-900 mt-1">{kpi.value}</p>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
       {/* Row 1: Activity + Subjects */}

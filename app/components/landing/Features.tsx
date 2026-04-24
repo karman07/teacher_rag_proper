@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Card, CardBody } from '@heroui/react';
+import { Card, CardBody, Button } from '@heroui/react';
 import {
   Brain, BookOpen, ShieldCheck, Bot
 } from 'lucide-react';
@@ -156,11 +156,13 @@ export default function Features() {
                   <h3 className="text-3xl font-black mb-2 text-white">Ready to ace your next exam?</h3>
                   <p className="text-slate-400 font-medium">Join thousands of students studying smarter.</p>
                 </div>
-                <Link href="/signup" className="relative z-10 w-full sm:w-auto">
-                  <button className="w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-slate-900 bg-white hover:bg-slate-50 transition-all shadow-xl active:scale-95 whitespace-nowrap">
-                    Start Studying Smarter
-                  </button>
-                </Link>
+                <Button
+                  as={Link}
+                  href="/signup"
+                  className="relative z-10 w-full sm:w-auto px-8 py-4 h-auto rounded-2xl font-bold text-slate-900 bg-white hover:bg-slate-50 transition-all shadow-xl active:scale-95 whitespace-nowrap"
+                >
+                  Start Studying Smarter
+                </Button>
               </CardBody>
             </Card>
           </motion.div>
