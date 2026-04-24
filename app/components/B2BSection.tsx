@@ -41,7 +41,7 @@ export default function B2BSection() {
               badge="For Institutions"
               title={<>Deploy TeachAI at <span className="text-blue-600 dark:text-blue-400">Scale</span></>}
               subtitle="Empower your faculty with the tools they need to succeed, while maintaining complete control over data and security."
-              align="left"
+              centered={false}
             />
             <Button
               as={Link}
