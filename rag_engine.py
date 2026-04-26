@@ -503,6 +503,83 @@ class RAGEngine:
             })
         elif ext == '.pdf':
             units = await self._extract_pdf_units(file_path, file_name)
+        elif ext == '.youtube':
+            with open(file_path, "r") as f:
+                url = f.read().strip()
+                
+            def _get_yt_transcript_sync():
+                from youtube_transcript_api._api import YouTubeTranscriptApi
+                from urllib.parse import urlparse, parse_qs
+                
+                parsed = urlparse(url)
+                video_id = None
+                if parsed.hostname == 'youtu.be':
+                    video_id = parsed.path[1:]
+                elif parsed.hostname in ('www.youtube.com', 'youtube.com'):
+                    if parsed.path == '/watch':
+                        video_id = parse_qs(parsed.query).get('v', [None])[0]
+                    elif parsed.path.startswith('/embed/'):
+                        video_id = parsed.path.split('/')[2]
+                    elif parsed.path.startswith('/v/'):
+                        video_id = parsed.path.split('/')[2]
+                if not video_id:
+                    raise ValueError(f"Could not extract video ID from {url}")
+                
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                try:
+                    # Try to get English transcript first
+                    t = transcript_list.find_transcript(['en'])
+                except Exception:
+                    # Fallback to the first available transcript and translate if possible
+                    t = list(transcript_list)[0]
+                    if t.is_translatable:
+                        try:
+                            t = t.translate('en')
+                        except Exception:
+                            pass
+                
+                transcript = t.fetch()
+                content = f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript]\n"
+                for chunk in transcript:
+                    start = chunk['start']
+                    m, s = divmod(start, 60)
+                    h, m = divmod(m, 60)
+                    timestamp = f"{int(h):02d}:{int(m):02d}:{int(s):02d}"
+                    content += f"[{timestamp}] {chunk['text']}\n"
+                return content
+            
+            try:
+                yt_desc = await asyncio.to_thread(_get_yt_transcript_sync)
+            except Exception as e:
+                logger.warning(f"[youtube] API failed: {e}. Falling back to audio download + Gemini transcription...")
+                def _download_audio():
+                    import yt_dlp
+                    import tempfile
+                    tmp_dir = tempfile.mkdtemp()
+                    ydl_opts = {
+                        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+                        'outtmpl': os.path.join(tmp_dir, '%(id)s.%(ext)s'),
+                        'quiet': True,
+                    }
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=True)
+                        audio_path = os.path.join(tmp_dir, f"{info['id']}.{info.get('ext', 'm4a')}")
+                    return audio_path
+                
+                audio_file_path = await asyncio.to_thread(_download_audio)
+                try:
+                    logger.info(f"[youtube] Transcribing downloaded audio via Gemini...")
+                    desc = await self._describe_audio_content(audio_file_path, "audio/x-m4a")
+                    yt_desc = f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Gemini Auto-Transcription)]\n{desc}"
+                finally:
+                    if os.path.exists(audio_file_path):
+                        os.remove(audio_file_path)
+            
+            units.append({
+                "kind": "youtube",
+                "page": None,
+                "content": yt_desc,
+            })
         else:
             # 2. Parse standard document
             text = parse_document(file_path)
@@ -743,8 +820,9 @@ The knowledge base context includes materials marked as **ASSIGNMENTS**. For the
 - If information is NOT in the context, say: "This specific detail isn't in the provided materials, but based on context..."
 - Do NOT invent facts or hallucinate content not grounded in the knowledge base.
 - Explain concepts at a university level — thorough, accurate, and pedagogically clear.
-
 - For complex topics, break them down step-by-step.
+- If your answer is based on a YouTube or Video transcript, YOU MUST cite the exact timestamp (e.g. [01:23:45]) from the transcript that answers the user's doubt, pointing them to the exact moment in the video.
+
 {assignment_protocol}
 ---
 
@@ -793,7 +871,11 @@ Rules:
         prompt_parts.append(f"Student Question: {effective_question}")
 
         # 6. Generate answer (offloaded to thread pool — non-blocking)
-        response = await asyncio.to_thread(self._gen_model.generate_content, prompt_parts)
+        response = await asyncio.to_thread(
+            self._gen_model.generate_content, 
+            prompt_parts,
+            generation_config={"response_mime_type": "application/json"}
+        )
         raw_response = (response.text or "").strip()
 
         def _extract_json_payload(text: str) -> Optional[dict]:

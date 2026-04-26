@@ -16,3 +16,5 @@ transformers==4.46.3
 pillow==10.4.0
 torch==2.5.1
 PyMuPDF==1.24.13
+youtube-transcript-api==0.6.3
+yt-dlp>=2024.3.10
