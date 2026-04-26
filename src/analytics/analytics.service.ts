@@ -479,17 +479,27 @@ export class AnalyticsService {
 
     // 1. Activity by Bucket
     const activityMap = new Map<string, number>();
-    const bucketFormat = timeframe === 'all' ? 'MMM' : 'MMM DD';
 
     // Initialize buckets
-    const numBuckets = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 12;
-    for (let i = numBuckets - 1; i >= 0; i--) {
-      const d = new Date();
-      if (timeframe === 'all') d.setMonth(now.getMonth() - i);
-      else d.setDate(now.getDate() - i);
-
-      const key = this.formatDateBucket(d, timeframe);
-      activityMap.set(key, 0);
+    if (timeframe === '7d') {
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(now.getDate() - i);
+            activityMap.set(this.formatDateBucket(d, timeframe), 0);
+        }
+    } else if (timeframe === '30d') {
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(now.getDate() - i);
+            activityMap.set(this.formatDateBucket(d, timeframe), 0);
+        }
+    } else {
+        // For 'all', we want daily data for the past 365 days
+        for (let i = 364; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(now.getDate() - i);
+            activityMap.set(this.formatDateBucket(d, timeframe), 0);
+        }
     }
 
     logs.forEach(log => {
@@ -601,12 +611,13 @@ export class AnalyticsService {
   }
 
   private formatDateBucket(date: Date, timeframe: string): string {
-    if (timeframe === 'all') {
-      return date.toLocaleDateString('en-US', { month: 'short' });
+    if (timeframe === '7d') {
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
     }
-    if (timeframe === '30d') {
-      return `${date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} ${date.getDate()}`;
-    }
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
+    // Return YYYY-MM-DD for consistent sorting and filtering
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }
