@@ -53,36 +53,38 @@ export default function Features() {
             <Card
               isPressable={false}
               shadow="none"
-              classNames={{
-                base: 'group border border-slate-200 hover:border-blue-300/50 transition-all duration-500 bg-gradient-to-br from-slate-50 to-blue-50/30 h-full overflow-hidden',
-                body: 'p-8 sm:p-12 relative',
-              }}
+              className="group border border-slate-200 hover:border-blue-300/50 transition-all duration-500 bg-gradient-to-br from-slate-50 to-blue-50/30 h-full overflow-hidden"
             >
-              <CardBody className="relative p-0 overflow-visible">
+              <CardBody className="p-8 sm:p-12 relative overflow-visible">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full group-hover:scale-110 transition-transform duration-700" />
-                <div className="relative z-10 max-w-md">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-8 shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform duration-500">
-                    <Brain size={28} />
-                  </div>
-                  <h3 className="text-3xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-blue-600 transition-colors">Ask Any Question.<br/>Get Instant Answers.</h3>
-                  <p className="text-base text-slate-600 font-medium leading-relaxed">
-                    Like having a tutor available 24/7—based exclusively on your own material. Don't rely on generic internet searches that might be wrong for your specific class.
-                  </p>
-                </div>
                 
-                {/* Visual Mockup */}
-                <div className="mt-10 sm:absolute sm:right-[-20px] sm:top-1/2 sm:-translate-y-1/2 w-[300px] sm:w-[400px] bg-white rounded-2xl border border-slate-200 shadow-xl p-4 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500 z-10">
-                  <div className="flex gap-3 items-start mb-4">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
-                    <div className="h-10 bg-slate-100 rounded-xl w-[80%]" />
+                <div className="grid lg:grid-cols-[1fr_400px] gap-12 items-center relative z-10">
+                  <div>
+                    <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-8 shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform duration-500">
+                      <Brain size={28} />
+                    </div>
+                    <h3 className="text-3xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-blue-600 transition-colors">Ask Any Question.<br/>Get Instant Answers.</h3>
+                    <p className="text-base text-slate-600 font-medium leading-relaxed max-w-md">
+                      Like having a tutor available 24/7—based exclusively on your own material. Don't rely on generic internet searches that might be wrong for your specific class.
+                    </p>
                   </div>
-                  <div className="flex gap-3 items-start">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-600"><Bot size={16}/></div>
-                    <div className="space-y-2 w-full">
-                      <div className="h-4 bg-slate-100 rounded w-full" />
-                      <div className="h-4 bg-slate-100 rounded w-[90%]" />
-                      <div className="h-4 bg-slate-100 rounded w-[60%]" />
-                      <div className="w-24 h-6 bg-blue-50 border border-blue-100 rounded-md mt-2" />
+                  
+                  {/* Visual Mockup */}
+                  <div className="relative group-hover:translate-x-2 transition-transform duration-500">
+                    <div className="w-full bg-white rounded-2xl border border-slate-200 shadow-2xl p-4 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500">
+                      <div className="flex gap-3 items-start mb-4">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+                        <div className="h-10 bg-slate-100 rounded-xl w-[80%]" />
+                      </div>
+                      <div className="flex gap-3 items-start">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 shrink-0 flex items-center justify-center text-blue-600"><Bot size={16}/></div>
+                        <div className="space-y-2 w-full">
+                          <div className="h-4 bg-slate-100 rounded w-full" />
+                          <div className="h-4 bg-slate-100 rounded w-[90%]" />
+                          <div className="h-4 bg-slate-100 rounded w-[60%]" />
+                          <div className="w-24 h-6 bg-blue-50 border border-blue-100 rounded-md mt-2" />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

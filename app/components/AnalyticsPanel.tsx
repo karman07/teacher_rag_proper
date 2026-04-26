@@ -12,41 +12,105 @@ import {
 } from '@/app/lib/analytics';
 import { studentApi } from '@/app/lib/api';
 
-// ── Mini bar chart ─────────────────────────────────────────────────────────────
-function MiniBarChart({ data, timeframe }: { data: { day: string; count: number }[], timeframe: string }) {
-  const max = Math.max(...data.map(d => d.count), 1);
-  return (
-    <div className="flex items-end gap-2 h-26 overflow-x-auto scrollbar-none pb-2">
-      {data.map((d, i) => {
-        // Split label for cleaner two-line display (e.g. "Mar 24" -> "Mar" + "24")
-        const parts = d.day.split(' ');
-        const labelTop = parts[0];
-        const labelBottom = parts[1] || '';
+import { Tooltip, Select, SelectItem } from '@heroui/react';
 
-        return (
-          <div key={i} className="flex-1 min-w-[36px] flex flex-col items-center gap-2.5">
-            <div className="w-full rounded-full bg-slate-50 relative overflow-hidden group border border-slate-100/50" style={{ height: 64 }}>
-              <motion.div
-                className={`absolute bottom-0 w-full ${d.count > 0 ? 'bg-blue-600' : 'bg-slate-200'} rounded-full shadow-[0_-4px_12px_rgba(37,99,235,0.1)] group-hover:bg-blue-500 transition-colors`}
-                initial={{ height: 0 }}
-                animate={{ height: `${(Math.max(d.count, 0) / max) * 100}%` }}
-                transition={{ duration: 0.6, delay: i * 0.02, ease: 'easeOut' }}
-              />
-              {d.count > 0 && (
-                  <div className="absolute top-0 left-0 w-full h-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-blue-600/10 pointer-events-none">
-                      <span className="text-[10px] font-black text-blue-700">{d.count}</span>
-                  </div>
-              )}
+// ── Contribution Heatmap (GitHub Style) ─────────────────────────────────────────
+function ContributionHeatmap({ data, timeframe }: { data: { day: string; count: number }[], timeframe: string }) {
+  const max = Math.max(...data.map(d => d.count), 1);
+  
+  const getLevel = (count: number) => {
+    if (count === 0) return 0;
+    if (count <= 1) return 1;
+    const ratio = count / max;
+    if (ratio <= 0.35) return 2;
+    if (ratio <= 0.7) return 3;
+    return 4;
+  };
+
+  const colorLevels = {
+    0: 'bg-slate-50',
+    1: 'bg-blue-100',
+    2: 'bg-blue-300',
+    3: 'bg-blue-500',
+    4: 'bg-blue-700',
+  };
+
+  const isSmall = timeframe === '7d';
+  
+  return (
+    <div className="flex flex-col gap-6">
+      <div className={`${isSmall ? 'flex flex-row justify-between gap-2 w-full px-2' : 'grid grid-cols-7 gap-y-4 gap-x-2'}`}>
+        {data.map((d, i) => {
+          const level = getLevel(d.count);
+          // Format date for tooltip if it's YYYY-MM-DD
+          let displayDay = d.day;
+          if (d.day.includes('-')) {
+              try {
+                  displayDay = new Date(d.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              } catch (e) {}
+          }
+
+          return (
+            <div key={i} className="flex flex-col items-center gap-3">
+                <Tooltip 
+                    content={
+                        <div className="px-2 py-1">
+                            <p className="text-[10px] font-black uppercase tracking-tight text-blue-200/60 mb-0.5">{displayDay}</p>
+                            <p className="text-sm font-black text-white">{d.count} Questions</p>
+                        </div>
+                    }
+                    delay={0}
+                    closeDelay={0}
+                    motionProps={{
+                        variants: {
+                            exit: { opacity: 0, scale: 0.9, transition: { duration: 0.1 } },
+                            enter: { opacity: 1, scale: 1, transition: { duration: 0.1 } },
+                        }
+                    }}
+                    classNames={{
+                        content: "bg-slate-950 border border-slate-800 shadow-2xl rounded-2xl p-3",
+                    }}
+                >
+                    <motion.div
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: (i % 30) * 0.01, type: 'spring', stiffness: 260, damping: 20 }}
+                        whileHover={{ scale: 1.1, zIndex: 10, borderRadius: '8px' }}
+                        className={`
+                            ${isSmall ? 'w-9 h-9' : 'w-full aspect-square max-w-[32px]'} 
+                            rounded-md ${colorLevels[level as keyof typeof colorLevels]} 
+                            cursor-pointer transition-all duration-300
+                            hover:shadow-[0_4px_20px_rgb(37,99,235,0.3)]
+                            border border-slate-100/50
+                        `}
+                    />
+                </Tooltip>
+                {isSmall ? (
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{d.day}</span>
+                ) : (
+                    <span className="text-[9px] font-black text-slate-400 tabular-nums">
+                        {(() => {
+                            const dateObj = new Date(d.day);
+                            return isNaN(dateObj.getTime()) ? '' : dateObj.getDate();
+                        })()}
+                    </span>
+                )}
             </div>
-            <div className="flex flex-col items-center leading-none gap-0.5 select-none">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{labelTop}</span>
-              {labelBottom && (
-                <span className="text-[10px] font-black text-slate-600 tracking-tighter">{labelBottom}</span>
-              )}
+          );
+        })}
+      </div>
+      
+      {!isSmall && (
+          <div className="flex items-center justify-end gap-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">
+            <span>Less</span>
+            <div className="flex gap-1.5">
+                {[0, 1, 2, 3, 4].map(l => (
+                    <div key={l} className={`w-3 h-3 rounded-[4px] ${colorLevels[l as keyof typeof colorLevels]} border border-slate-100/50`} />
+                ))}
             </div>
+            <span>More</span>
           </div>
-        );
-      })}
+      )}
     </div>
   );
 }
@@ -188,6 +252,7 @@ export default function AnalyticsPanel() {
   const [totalTimeSpent, setTotalTimeSpent] = useState(0);
   const [totalPageViews, setTotalPageViews] = useState(0);
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('7d');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -293,17 +358,53 @@ export default function AnalyticsPanel() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Daily Activity Chart */}
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 flex flex-col group hover:border-blue-600/30 transition-colors">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 shadow-sm text-blue-600 flex items-center justify-center shrink-0">
-              <Activity size={20} />
+          <div className="flex items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 shadow-sm text-blue-600 flex items-center justify-center shrink-0">
+                <Activity size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Question Frequency</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                  {timeframe === 'all' ? `Daily activity for ${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : 'Timeline engagement'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Question Frequency</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Timeline engagement</p>
-            </div>
+
+            {timeframe === 'all' && (
+                <div className="w-40">
+                  <Select
+                    label="Select Month"
+                    size="sm"
+                    className="max-w-xs"
+                    selectedKeys={[selectedMonth]}
+                    onSelectionChange={(keys) => setSelectedMonth(Array.from(keys)[0] as string)}
+                    classNames={{
+                        trigger: "bg-slate-50 border-slate-100 rounded-xl min-h-10",
+                        label: "text-[10px] font-black uppercase tracking-widest text-slate-400",
+                        value: "text-[11px] font-black text-slate-700"
+                    }}
+                  >
+                    {/* Generate last 12 months for selection */}
+                    {Array.from({ length: 12 }).map((_, i) => {
+                        const d = new Date();
+                        d.setMonth(d.getMonth() - i);
+                        const val = d.toISOString().slice(0, 7);
+                        const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                        return <SelectItem key={val}>{label}</SelectItem>;
+                    })}
+                  </Select>
+                </div>
+            )}
           </div>
           <div className="mt-auto">
-            <MiniBarChart data={activity} timeframe={timeframe} />
+            <ContributionHeatmap 
+                data={timeframe === 'all' 
+                    ? activity.filter(d => d.day.startsWith(selectedMonth))
+                    : activity
+                } 
+                timeframe={timeframe} 
+            />
           </div>
         </div>
 
