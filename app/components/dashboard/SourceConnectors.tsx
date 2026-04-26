@@ -44,6 +44,12 @@ const S3Icon = () => (
   </svg>
 );
 
+const YoutubeIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#FF0000">
+    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+  </svg>
+);
+
 const SOURCES = [
   {
     id: 'google_drive',
@@ -58,6 +64,13 @@ const SOURCES = [
     name: 'Amazon S3',
     description: 'Import from AWS S3 Buckets',
     icon: <S3Icon />,
+    available: true,
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    description: 'Import video transcripts directly',
+    icon: <YoutubeIcon />,
     available: true,
   },
   {
@@ -201,9 +214,13 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
     key: '',
   });
 
+  const [ytModalOpen, setYtModalOpen] = useState(false);
+  const [ytUrl, setYtUrl] = useState('');
+
   const handleConnect = (sourceId: string) => {
     if (sourceId === 'google_drive') handleGoogleDrive();
     else if (sourceId === 's3') setS3ModalOpen(true);
+    else if (sourceId === 'youtube') setYtModalOpen(true);
   };
 
   const handleS3Import = async () => {
@@ -228,6 +245,29 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
       setTimeout(() => setSuccessId(null), 3000);
     } catch (err: any) {
       alert(`S3 Import failed: ${err.message}`);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleYoutubeImport = async () => {
+    if (!ytUrl) {
+      alert('Please enter a YouTube URL');
+      return;
+    }
+    
+    setLoading('youtube');
+    try {
+      const result = await knowledgeBaseApi.importFromYoutube({
+        url: ytUrl,
+        subjectId: subjectId,
+      });
+      onImportComplete(result);
+      setSuccessId('youtube');
+      setYtModalOpen(false);
+      setTimeout(() => setSuccessId(null), 3000);
+    } catch (err: any) {
+      alert(`YouTube Import failed: ${err.message}`);
     } finally {
       setLoading(null);
     }
@@ -352,6 +392,34 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
           <ModalFooter>
             <Button variant="light" onPress={() => setS3ModalOpen(false)} className="font-bold">Cancel</Button>
             <Button color="primary" onPress={handleS3Import} isLoading={loading === 's3'} className="font-black bg-blue-600">Import S3 File</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* YouTube Modal */}
+      <Modal isOpen={ytModalOpen} onClose={() => setYtModalOpen(false)} size="md">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <YoutubeIcon />
+              <span className="font-black text-xl">Import YouTube Video</span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium">We'll extract and index the video's transcript automatically.</p>
+          </ModalHeader>
+          <ModalBody>
+            <div className="space-y-1 py-4">
+              <label className="text-[10px] font-black uppercase text-slate-500">YouTube Video URL</label>
+              <input 
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-sm"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={ytUrl}
+                onChange={e => setYtUrl(e.target.value)}
+              />
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setYtModalOpen(false)} className="font-bold">Cancel</Button>
+            <Button color="danger" onPress={handleYoutubeImport} isLoading={loading === 'youtube'} className="font-black">Import Transcript</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

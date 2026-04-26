@@ -151,6 +151,20 @@ export const knowledgeBaseApi = {
     return data;
   },
 
+  importFromYoutube: async (payload: {
+    url: string;
+    subjectId?: string;
+  }): Promise<KnowledgeFile> => {
+    const res = await fetch(`${API}/knowledge-base/youtube`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'YouTube import failed');
+    return data;
+  },
+
   deleteFile: async (fileId: string): Promise<void> => {
     const res = await fetch(`${API}/knowledge-base/files/${fileId}`, {
       method: 'DELETE',
