@@ -21,6 +21,7 @@ enum FileSource {
   notion
   onedrive
   s3
+  youtube
 }
 
 enum FileStatus {

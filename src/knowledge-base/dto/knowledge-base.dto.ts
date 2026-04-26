@@ -72,6 +72,17 @@ export class UploadS3Dto {
   subjectId?: string;
 }
 
+export class UploadYoutubeDto {
+  @ApiProperty({ description: 'YouTube video URL' })
+  @IsString()
+  url: string;
+
+  @ApiPropertyOptional({ description: 'ID of the subject to associate with' })
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
+}
+
 export class FileListQueryDto {
   @ApiPropertyOptional({ enum: FileSource, description: 'Filter by file source' })
   @IsOptional()

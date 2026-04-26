@@ -34,6 +34,7 @@ import {
   UploadDropboxDto,
   UploadS3Dto,
   FileListQueryDto,
+  UploadYoutubeDto,
 } from './dto/knowledge-base.dto';
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024; // 1 GB
@@ -123,6 +124,15 @@ export class KnowledgeBaseController {
   importFromS3(@Request() req: any, @Body() dto: UploadS3Dto) {
     return this.knowledgeBaseService.handleS3Import(req.user.id, dto);
   }
+
+  // ─── YouTube ──────────────────────────────────────────────────────────────
+
+  @Post('youtube')
+  @ApiOperation({ summary: 'Import transcript from a YouTube video' })
+  importFromYoutube(@Request() req: any, @Body() dto: UploadYoutubeDto) {
+    return this.knowledgeBaseService.handleYoutubeImport(req.user.id, dto);
+  }
+
 
   // ─── Delete file ─────────────────────────────────────────────────────────
 

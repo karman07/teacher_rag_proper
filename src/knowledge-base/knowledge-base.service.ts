@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileSource, FileStatus, User } from '@prisma/client';
-import { UploadGoogleDriveDto, UploadDropboxDto, UploadS3Dto } from './dto/knowledge-base.dto';
+import { UploadGoogleDriveDto, UploadDropboxDto, UploadS3Dto, UploadYoutubeDto } from './dto/knowledge-base.dto';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { google } from 'googleapis';
 import axios from 'axios';
@@ -371,6 +371,49 @@ export class KnowledgeBaseService {
       if (subject) collectionNameS3 = subject.collectionName;
     }
     this.triggerRagIngestion(dbFile.id, teacherId, collectionNameS3, destPath, path.basename(dto.key), dbFile.isAssignment);
+
+    return {
+      ...dbFile,
+      status: FileStatus.processing,
+      sizeBytes: Number(dbFile.sizeBytes),
+    };
+  }
+
+  // ─── YouTube ──────────────────────────────────────────────────────────────
+
+  async handleYoutubeImport(teacherId: string, dto: UploadYoutubeDto) {
+    await this.ensureKnowledgeBase(teacherId);
+
+    const fileName = `${uuidv4()}.youtube`;
+    const teacherDir = path.join(this.uploadsRoot, teacherId);
+    fs.mkdirSync(teacherDir, { recursive: true });
+    const destPath = path.join(teacherDir, fileName);
+
+    fs.writeFileSync(destPath, dto.url);
+
+    const dbFile = await this.prisma.knowledgeFile.create({
+      data: {
+        teacherId,
+        name: fileName,
+        originalName: dto.url,
+        mimeType: 'text/plain',
+        sizeBytes: BigInt(dto.url.length),
+        storagePath: destPath,
+        source: FileSource.youtube,
+        status: FileStatus.ready,
+        subjectId: dto.subjectId,
+      },
+    });
+
+    await this.updateKbStats(teacherId);
+
+    const kbYt = await this.ensureKnowledgeBase(teacherId);
+    let collectionNameYt = kbYt.collectionName;
+    if (dto.subjectId) {
+      const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
+      if (subject) collectionNameYt = subject.collectionName;
+    }
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameYt, destPath, dto.url, dbFile.isAssignment);
 
     return {
       ...dbFile,
