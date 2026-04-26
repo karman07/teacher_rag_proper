@@ -29,6 +29,7 @@ type SourceFocusRequest = {
   snippet?: string | null;
   highlightText?: string | null;
   yOffset?: number | null;
+  timestamp?: string | null;
 };
 
 const renderInline = (
@@ -37,8 +38,8 @@ const renderInline = (
   sources: RAGSource[] = [],
   onSourceClick?: (source: RAGSource) => void,
 ) => {
-  // Split on **bold**, `code`, inline source references [Source: ...], and (Source N) patterns
-  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\[Source:\s*[^\]]+\]|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?)/gi);
+  // Split on **bold**, `code`, inline source references *[Source: ...]* or [Source: ...], (Source N), and timestamps [00:00:00]
+  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\*?\[Source:\s*[^\]]+\]\*?|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?|\[\d{2,}:\d{2}(?::\d{2})?\])/gi);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 bg-amber-100/50 px-1 rounded-md'}`}>{part.slice(2, -2)}</strong>;
@@ -47,29 +48,57 @@ const renderInline = (
       return <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-blue-700 font-mono text-xs font-bold">{part.slice(1, -1)}</code>;
     }
 
-    // Inline [Source: filename.pdf, chunk N] pattern
-    const inlineSourceMatch = part.match(/^\[Source:\s*([^,\]]+?)(?:,?\s*chunk\s*(\d+)|,?\s*Page\s*(\d+))?\s*\]$/i);
+    // Video timestamp [MM:SS] or [HH:MM:SS]
+    const timeMatch = part.match(/^\[(\d{2,}:\d{2}(?::\d{2})?)\]$/);
+    if (timeMatch && role === 'assistant') {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 rounded-md text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-300 transition-all cursor-pointer hover:bg-rose-200"
+          title="Video Timestamp"
+          onClick={() => {
+            if (sources.length > 0 && onSourceClick) {
+              const youtubeSource = sources.find(s => s.content_type === 'youtube' || s.content_type === 'video') || sources[0];
+              onSourceClick({ ...youtubeSource, timestamp: timeMatch[1] });
+            }
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          {timeMatch[1]}
+        </span>
+      );
+    }
+
+    // Inline [Source: filename.pdf, chunk N] pattern or [Source: 6, 08:53] pattern
+    const inlineSourceMatch = part.match(/^\*?\[Source:\s*([^,\]]+?)(?:,?\s*(?:chunk\s*(\d+)|Page\s*(\d+)|(\d{2,}:\d{2}(?::\d{2})?)))?\s*\]\*?$/i);
     if (inlineSourceMatch && sources.length && onSourceClick && role === 'assistant') {
       const refName = inlineSourceMatch[1].trim();
       const chunkIdx = inlineSourceMatch[2] ? parseInt(inlineSourceMatch[2]) - 1 : null;
-      // Find best matching source
-      const src = sources.find(s =>
+      const timestamp = inlineSourceMatch[4] || null;
+      
+      const possibleIndex = parseInt(refName) - 1;
+      let src = sources.find(s =>
         (s.file_name || '').toLowerCase().includes(refName.toLowerCase()) ||
         refName.toLowerCase().includes((s.file_name || '').toLowerCase().split('/').pop()?.toLowerCase() || '')
         || (chunkIdx !== null && s.chunk_idx === chunkIdx)
-      ) || sources[0];
+      );
+      if (!src && !isNaN(possibleIndex) && possibleIndex >= 0 && possibleIndex < sources.length) {
+        src = sources[possibleIndex];
+      }
+      if (!src) src = sources[0];
+
       if (src) {
         const srcIdx = sources.indexOf(src);
         const label = `Source ${srcIdx + 1}`;
         return (
           <button
             key={i}
-            onClick={() => onSourceClick(src)}
-            title={src.page ? `Jump to Source ${srcIdx + 1} (page ${src.page})` : `Jump to Source ${srcIdx + 1}`}
+            onClick={() => onSourceClick({ ...src, timestamp })}
+            title={src.page ? `Jump to Source ${srcIdx + 1} (page ${src.page})` : timestamp ? `Jump to ${timestamp} in video` : `Jump to Source ${srcIdx + 1}`}
             className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 rounded-md text-[10px] font-black text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 hover:border-amber-400 transition-all cursor-pointer underline-offset-2 group"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="shrink-0"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            {label}{src.page ? ` · p${src.page}` : ''}
+            {label}{src.page ? ` · p${src.page}` : ''}{timestamp ? ` · ${timestamp}` : ''}
           </button>
         );
       }
@@ -119,7 +148,9 @@ const MarkdownContent = ({
   onSourceClick?: (source: RAGSource) => void,
 }) => {
   if (typeof content !== 'string') return null;
-  const lines = content.split('\n');
+  // Normalize literal "\n" strings that sometimes leak from JSON stringification or LLM outputs
+  const normalizedContent = content.replace(/\\n/g, '\n');
+  const lines = normalizedContent.split('\n');
   const result: React.ReactNode[] = [];
   let i = 0;
 
@@ -404,28 +435,21 @@ export default function ClassroomPage() {
 
   const handleSourceClick = useCallback((source: RAGSource) => {
     // Try to find the exact file; fall back to selectedFile so the click never silently fails
-    const f = files.find((item: any) => item.id === source.file_id) ?? selectedFile;
-    console.log('[handleSourceClick] file_id:', source.file_id, '| found:', !!f, '| page:', source.page, '| files:', files.map((x: any) => x.id));
-    console.log('[handleSourceClick] highlight payload', {
-      hasHighlightText: !!source.highlight_text,
-      highlightLength: source.highlight_text?.length ?? 0,
-      snippetLength: source.snippet?.length ?? 0,
-      chunkIdx: source.chunk_idx,
-      page: source.page,
-    });
-    if (!f) return;
-
-    setSelectedFile(f);
-    setShowDoc(true);
-    setSourceFocusRequest({
-      requestId: crypto.randomUUID(),
-      fileId: f.id,          // use the matched file's actual id
-      page: source.page,
-      chunkIdx: source.chunk_idx,
-      snippet: source.snippet,
-      highlightText: source.highlight_text ?? source.snippet,
-      yOffset: source.y_offset ?? null,
-    });
+    const file = files.find((item: any) => item.id === source.file_id) ?? selectedFile;
+    if (file) {
+      setSelectedFile(file);
+      setShowDoc(true);
+      setSourceFocusRequest({
+        requestId: crypto.randomUUID(),
+        fileId: source.file_id,
+        page: source.page,
+        chunkIdx: source.chunk_idx,
+        snippet: source.snippet,
+        highlightText: source.highlight_text,
+        yOffset: source.y_offset ?? null,
+        timestamp: source.timestamp
+      });
+    }
   }, [files, selectedFile]);
 
   const filteredFiles = files.filter((f: any) =>
@@ -488,7 +512,7 @@ export default function ClassroomPage() {
               }`}
             >
               <div className={`p-2.5 rounded-xl shrink-0 ${active ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
-                {file.mimeType?.includes('video') ? <Video size={18} /> : 
+                {file.mimeType?.includes('video') || file.source === 'youtube' ? <Video size={18} /> : 
                  file.mimeType?.includes('image') ? <ImageIcon size={18} /> : 
                  file.mimeType?.includes('audio') ? <Music size={18} /> : 
                  <FileText size={18} />}
@@ -686,6 +710,8 @@ export default function ClassroomPage() {
                     mimeType={selectedFile.mimeType}
                     classId={classId}
                     selectedFileId={selectedFile.id}
+                    fileSource={selectedFile.source}
+                    originalName={selectedFile.originalName}
                     sourceFocusRequest={sourceFocusRequest}
                     onClose={() => setShowDoc(false)}
                     onPageChange={setCurrentPage}

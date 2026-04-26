@@ -20,6 +20,7 @@ export interface RAGSource {
   highlight_start?: number | null;
   highlight_end?: number | null;
   y_offset?: number | null;  // normalized Y position (0–1) within the PDF page
+  timestamp?: string | null; // video timestamp like 01:23
 }
 
 export interface RAGQueryResponse {

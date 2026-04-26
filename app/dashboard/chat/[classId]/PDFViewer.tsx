@@ -33,6 +33,7 @@ interface PDFViewerProps {
     snippet?: string | null;
     highlightText?: string | null;
     yOffset?: number | null;
+    timestamp?: string | null;
   } | null;
 }
 
@@ -48,8 +49,9 @@ interface SavedNote {
 
 export default function PDFViewer({
   url, fileName, mimeType = 'application/pdf',
-  onClose, onSelection, onPageChange, classId, selectedFileId, sourceFocusRequest
-}: PDFViewerProps) {
+  onClose, onSelection, onPageChange, classId, selectedFileId, sourceFocusRequest,
+  fileSource, originalName
+}: PDFViewerProps & { fileSource?: string, originalName?: string }) {
   const [scale, setScale] = useState(1.2);
   const [currentPage, setCurrentPage] = useState(1);
   const [snippetMode, setSnippetMode] = useState(false);
@@ -70,6 +72,25 @@ export default function PDFViewer({
   const isImage = mimeType.includes('image');
   const isVideo = mimeType.includes('video');
   const isAudio = mimeType.includes('audio');
+  const isYouTube = fileSource === 'youtube' || fileName.endsWith('.youtube') || mimeType === 'application/vnd.youtube.yt' || mimeType === 'text/plain' && originalName?.includes('youtube.com');
+  
+  const extractYoutubeVideoId = (urlStr: string) => {
+    const match = urlStr.match(/(?:v=|youtu\.be\/|embed\/)([^&?]+)/);
+    return match ? match[1] : null;
+  };
+
+  const parseTimestampToSeconds = (ts: string | null | undefined) => {
+    if (!ts) return null;
+    const parts = ts.split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  };
+
+  const youtubeVideoId = isYouTube ? extractYoutubeVideoId(originalName || '') : null;
+  const startSeconds = parseTimestampToSeconds(sourceFocusRequest?.timestamp);
+  const youtubeUrl = youtubeVideoId ? `https://www.youtube.com/embed/${youtubeVideoId}${startSeconds ? `?start=${startSeconds}&autoplay=1` : ''}` : '';
+
   const token = typeof window !== 'undefined' ? localStorage.getItem('student-token') : '';
   const authenticatedUrl = `${url}${url.includes('?') ? '&' : '?'}token=${token}`;
 
@@ -647,7 +668,7 @@ export default function PDFViewer({
       <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-slate-100 bg-slate-50/80 z-20">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 rounded-xl bg-blue-100 text-blue-600 shrink-0">
-            {isVideo ? <Video size={16} /> : isAudio ? <Music size={16} /> : isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
+            {isYouTube || isVideo ? <Video size={16} /> : isAudio ? <Music size={16} /> : isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
           </div>
           <div className="min-w-0">
             <span className="text-sm font-bold truncate block max-w-[180px] text-slate-800" title={fileName}>{fileName}</span>
@@ -713,6 +734,22 @@ export default function PDFViewer({
           ) : isImage ? (
             <div className="flex justify-center p-4">
               <img src={authenticatedUrl} alt={fileName} className="max-w-full rounded-lg shadow-2xl" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
+            </div>
+          ) : isYouTube ? (
+            <div className="h-full w-full flex items-center justify-center p-4 bg-slate-900 border-2 border-dashed border-slate-700 m-2 rounded-2xl overflow-hidden shadow-2xl">
+              {youtubeVideoId ? (
+                <iframe 
+                  width="100%" 
+                  height="100%" 
+                  src={youtubeUrl} 
+                  frameBorder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen 
+                  className="rounded-xl"
+                />
+              ) : (
+                <p className="text-white text-sm font-bold">Could not load YouTube Video</p>
+              )}
             </div>
           ) : isVideo ? (
             <div className="h-full flex items-center justify-center p-4 bg-slate-900 border-2 border-dashed border-slate-700 m-2 rounded-2xl overflow-hidden shadow-2xl">
