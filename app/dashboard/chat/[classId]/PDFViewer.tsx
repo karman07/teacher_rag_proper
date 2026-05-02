@@ -30,6 +30,7 @@ interface PDFViewerProps {
     fileId: string;
     page?: number | null;
     chunkIdx?: number | null;
+    imageIndex?: number | null;
     snippet?: string | null;
     highlightText?: string | null;
     yOffset?: number | null;
@@ -67,11 +68,13 @@ export default function PDFViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const drawingRef = useRef<{ x: number; y: number } | null>(null);
   const similarityHighlightedSpansRef = useRef<HTMLElement[]>([]);
+  const imageRef = useRef<HTMLImageElement>(null);
 
-  const isPDF = mimeType.includes('pdf');
-  const isImage = mimeType.includes('image');
-  const isVideo = mimeType.includes('video');
-  const isAudio = mimeType.includes('audio');
+  const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
+  const isPDF = mimeType.includes('pdf') || fileExt === 'pdf';
+  const isImage = mimeType.includes('image') || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(fileExt);
+  const isVideo = mimeType.includes('video') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(fileExt);
+  const isAudio = mimeType.includes('audio') || ['mp3', 'wav', 'aac', 'm4a'].includes(fileExt);
   const isYouTube = fileSource === 'youtube' || fileName.endsWith('.youtube') || mimeType === 'application/vnd.youtube.yt' || mimeType === 'text/plain' && originalName?.includes('youtube.com');
   
   const extractYoutubeVideoId = (urlStr: string) => {
@@ -284,10 +287,25 @@ export default function PDFViewer({
   // React to source focus requests — DOM-based page scrolling + search highlight
   const lastSourceRequestId = useRef<string | null>(null);
   useEffect(() => {
-    if (!sourceFocusRequest || !isPDF) return;
+    if (!sourceFocusRequest) return;
     if (lastSourceRequestId.current === sourceFocusRequest.requestId) return;
     lastSourceRequestId.current = sourceFocusRequest.requestId;
     clearSimilarityHighlights();
+
+    if (isImage) {
+      if (imageRef.current) {
+        imageRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const originalShadow = imageRef.current.style.boxShadow;
+        imageRef.current.style.transition = 'box-shadow 0.3s ease';
+        imageRef.current.style.boxShadow = '0 0 0 8px rgba(59, 130, 246, 0.6)';
+        setTimeout(() => {
+          if (imageRef.current) imageRef.current.style.boxShadow = originalShadow;
+        }, 1500);
+      }
+      return;
+    }
+
+    if (!isPDF) return;
 
     const timers: number[] = [];
     const pushTimer = (id: number) => timers.push(id);
@@ -339,8 +357,32 @@ export default function PDFViewer({
       }, 420));
     }
 
+    const isPdfImage = (sourceFocusRequest.imageIndex != null && sourceFocusRequest.imageIndex > 0) || (snippet || highlightText || '').includes('[Classification: Image');
+    
+    if (isPdfImage && page && page > 0) {
+      pushTimer(window.setTimeout(() => {
+        const pageEl = findPageLayer(page);
+        if (pageEl) {
+          const originalShadow = pageEl.style.boxShadow;
+          pageEl.style.transition = 'box-shadow 0.3s ease';
+          pageEl.style.boxShadow = 'inset 0 0 0 8px rgba(250, 204, 21, 0.6)';
+          setTimeout(() => {
+            if (pageEl) pageEl.style.boxShadow = originalShadow;
+          }, 2000);
+        }
+      }, 500));
+      return () => {
+        setTargetPagesRef.current?.(() => true);
+        clearSimilarityHighlights();
+        cleanupTimers();
+      };
+    }
+
     // Highlight snippet text via search plugin
-    const effectiveHighlight = (highlightText || snippet || '').replace(/\[\/?source.*?\]/g, '').trim();
+    const effectiveHighlight = (highlightText || snippet || '')
+      .replace(/\[\s*Source[^\]]*\]/gi, '')
+      .replace(/\[\s*Classification[^\]]*\]/gi, '')
+      .trim();
     if (effectiveHighlight) {
       const normalizeForSearch = (input: string) => {
         return input
@@ -569,7 +611,7 @@ export default function PDFViewer({
       cleanupTimers();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceFocusRequest, isPDF, clearSimilarityHighlights]);
+  }, [sourceFocusRequest, isPDF, isImage, clearSimilarityHighlights]);
 
   // --- renderPage: inject note highlight overlays directly into each page ---
   const renderPage: RenderPage = useCallback((props: RenderPageProps) => {
@@ -733,7 +775,7 @@ export default function PDFViewer({
             </Worker>
           ) : isImage ? (
             <div className="flex justify-center p-4">
-              <img src={authenticatedUrl} alt={fileName} className="max-w-full rounded-lg shadow-2xl" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
+              <img ref={imageRef} src={authenticatedUrl} alt={fileName} className="max-w-full rounded-lg shadow-2xl" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
             </div>
           ) : isYouTube ? (
             <div className="h-full w-full flex items-center justify-center p-4 bg-slate-900 border-2 border-dashed border-slate-700 m-2 rounded-2xl overflow-hidden shadow-2xl">

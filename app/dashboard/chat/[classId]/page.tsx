@@ -26,6 +26,7 @@ type SourceFocusRequest = {
   fileId: string;
   page?: number | null;
   chunkIdx?: number | null;
+  imageIndex?: number | null;
   snippet?: string | null;
   highlightText?: string | null;
   yOffset?: number | null;
@@ -444,6 +445,7 @@ export default function ClassroomPage() {
         fileId: source.file_id,
         page: source.page,
         chunkIdx: source.chunk_idx,
+        imageIndex: source.image_index,
         snippet: source.snippet,
         highlightText: source.highlight_text,
         yOffset: source.y_offset ?? null,

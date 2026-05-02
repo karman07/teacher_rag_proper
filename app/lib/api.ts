@@ -65,6 +65,7 @@ export const studentApi = {
 
   // ─── Analytics ──────────────────────────────────────────────────────────────
   getPersonalAnalytics: async (timeframe: '7d' | '30d' | 'all' = '7d') => {
+    // Triggers hot reload for Turbopack to pick up the headers fix
     const res = await axios.get(`${API_URL}/analytics/student/personal?timeframe=${timeframe}`, { headers: getAuthHeaders() });
     return res.data;
   },
