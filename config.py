@@ -6,18 +6,25 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    gemini_api_key: str | None = None
-    chroma_persist_dir: str = "./chroma_db"
+    # ── GPU Gateway ────────────────────────────────────────────────────────
+    gpu_gateway_url: str = "https://8080-66976dwa2.brevlab.com"
+
+    # ── Local paths ────────────────────────────────────────────────────────
     uploads_root: str = "../backend/uploads"
+
+    # ── Service ────────────────────────────────────────────────────────────
     rag_host: str = "0.0.0.0"
     rag_port: int = 8000
-    image_caption_backend: str = "gemini"
-    vision_model_name: str = "models/gemini-2.5-flash"
-    blip_model_name: str = "Salesforce/blip-image-captioning-base"
+
+    # ── PDF processing ─────────────────────────────────────────────────────
     pdf_max_pages: int = 20
-    pdf_max_images_per_page: int = 2
+    pdf_max_images_per_page: int = 10
     pdf_min_image_area: int = 40000
     pdf_vision_concurrency: int = 4
+
+    # ── Models (served by the GPU cluster) ─────────────────────────────────
+    llm_model_name: str = "llama70b"
+    vision_model_name: str = "qwen-vl"
 
     class Config:
         env_file = ".env"

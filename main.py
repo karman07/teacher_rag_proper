@@ -1,11 +1,11 @@
 """
 main.py — FastAPI RAG Service
-Endpoints:
+End points:
   POST /ingest          — Ingest a file into a teacher's collection
   POST /query           — Query a teacher's knowledge base
   DELETE /files/{id}    — Remove file chunks from a collection
   GET  /health          — Health check
-  GET  /collections     — List ChromaDB collections (admin)
+  GET  /collections     — List Qdrant collections (admin)
 """
 
 import logging
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TeachAI RAG Service",
-    description="Per-teacher RAG pipeline using Gemini + ChromaDB",
+    description="Per-teacher RAG pipeline using Llama 3.3 + Qdrant (GPU cluster)",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -57,7 +57,7 @@ app.add_middleware(
 
 class IngestRequest(BaseModel):
     teacher_id:      str = Field(..., description="UUID of the teacher")
-    collection_name: str = Field(..., description="ChromaDB collection name (from DB)")
+    collection_name: str = Field(..., description="Qdrant collection name (from DB)")
     file_id:         str = Field(..., description="UUID of the KnowledgeFile record")
     file_path:       str = Field(..., description="Absolute path to the file on disk")
     file_name:       str = Field(..., description="Original filename for display")
@@ -120,7 +120,7 @@ async def health():
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest_file(req: IngestRequest):
     """
-    Parse and embed a teacher's file into their private ChromaDB collection.
+    Parse and embed a teacher's file into their private Qdrant collection.
     This is called by the NestJS backend after a successful file upload.
     """
     try:
@@ -177,10 +177,46 @@ async def query_knowledge_base(req: QueryRequest):
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
+@app.post("/query-stream")
+async def query_knowledge_base_stream(req: QueryRequest):
+    """
+    Query a teacher's knowledge base and stream the response tokens.
+    Metadata (citations) are sent as a special block at the end.
+    """
+    from fastapi.responses import StreamingResponse
+    import json
+
+    async def stream_generator():
+        try:
+            engine = get_engine()
+            history = (
+                [{"role": m.role, "content": m.content} for m in req.chat_history]
+                if req.chat_history else None
+            )
+            async for chunk in engine.stream_query(
+                teacher_id=req.teacher_id,
+                collection_name=req.collection_name,
+                question=req.question,
+                image_base64=req.image_base64,
+                top_k=req.top_k,
+                chat_history=history,
+            ):
+                yield chunk
+        except Exception as e:
+            logger.error(f"Stream Query error: {e}", exc_info=True)
+            yield f"\n[ERROR]{str(e)}"
+
+    return StreamingResponse(
+        stream_generator(), 
+        media_type="text/plain",
+        headers={"X-Accel-Buffering": "no"}
+    )
+
+
 @app.delete("/files/{file_id}")
 async def delete_file_chunks(file_id: str, req: DeleteRequest):
     """
-    Remove all chunks for a given file from the teacher's ChromaDB collection.
+    Remove all chunks for a given file from the teacher's Qdrant collection.
     Called when a teacher deletes a file from their knowledge base.
     """
     try:
@@ -197,17 +233,17 @@ async def delete_file_chunks(file_id: str, req: DeleteRequest):
 
 @app.get("/collections")
 async def list_collections(x_admin_key: str = Header(default=None)):
-    """Admin endpoint to list all ChromaDB collections (teachers)."""
+    """Admin endpoint to list all Qdrant collections."""
     cfg = get_settings()
     expected = getattr(cfg, 'admin_secret', None)
     if not expected or x_admin_key != expected:
         raise HTTPException(status_code=403, detail="Forbidden: valid X-Admin-Key header required")
     from rag_engine import get_engine
     engine = get_engine()
-    cols = engine._chroma.list_collections()
+    cols = await engine.gpu.qdrant_list_collections()
     return {
         "collections": [
-            {"name": c.name, "count": c.count(), "metadata": c.metadata}
+            {"name": c.get("name")}
             for c in cols
         ]
     }
