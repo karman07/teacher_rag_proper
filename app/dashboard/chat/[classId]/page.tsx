@@ -11,7 +11,7 @@ import {
   RotateCcw, Video, Image as ImageIcon, Music, History, Plus,
 } from 'lucide-react';
 import { studentApi, incrementQuestionsAsked, ChatSession } from '@/app/lib/api';
-import { queryRAG, ChatMessage, RAGSource } from '@/app/lib/rag';
+import { queryRAGStream, ChatMessage, RAGSource } from '@/app/lib/rag';
 import { saveQuestionRecord, extractTopics } from '@/app/lib/analytics';
 import dynamic from 'next/dynamic';
 
@@ -39,12 +39,27 @@ const renderInline = (
   sources: RAGSource[] = [],
   onSourceClick?: (source: RAGSource) => void,
 ) => {
-  // Split on **bold**, `code`, inline source references *[Source: ...]* or [Source: ...], (Source N), and timestamps [00:00:00]
-  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\*?\[Source:\s*[^\]]+\]\*?|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?|\[\d{2,}:\d{2}(?::\d{2})?\])/gi);
+  // Split on **bold**, `code`, math $$...$$, math $...$, citations, and timestamps
+  const parts = text.split(/(\$\$[\s\S]*?\$\$|\$.*?\$|\*\*.*?\*\*|`[^`]+`|\*?\[Source:\s*[^\]]+\]\*?|\(?(?:Source\s+\d+(?:\s*,\s*Source\s+\d+)*)\)?|\[\d{2,}:\d{2}(?::\d{2})?\])/gi);
   return parts.map((part, i) => {
+    // Math block
+    if (part.startsWith('$$') && part.endsWith('$$')) {
+      return (
+        <div key={i} className="my-2 p-3 bg-slate-50 rounded-lg overflow-x-auto text-center font-serif"
+             dangerouslySetInnerHTML={{ __html: part }} />
+      );
+    }
+    // Inline math
+    if (part.startsWith('$') && part.endsWith('$')) {
+      return (
+        <span key={i} className="font-serif italic mx-0.5"
+              dangerouslySetInnerHTML={{ __html: part }} />
+      );
+    }
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i} className={`font-black ${role === 'user' ? 'text-white' : 'text-slate-900 bg-amber-100/50 px-1 rounded-md'}`}>{part.slice(2, -2)}</strong>;
     }
+
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
       return <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-blue-700 font-mono text-xs font-bold">{part.slice(1, -1)}</code>;
     }
@@ -301,7 +316,19 @@ export default function ClassroomPage() {
   const inputRef   = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchClass(); }, [classId]);
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { 
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
+    // Trigger KaTeX rendering for new content
+    if (typeof window !== 'undefined' && (window as any).renderMathInElement) {
+      (window as any).renderMathInElement(document.body, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+  }, [messages]);
 
   // ── Auto-create a session when classroom loads ──
   const ensureSession = useCallback(async (subjectId: string) => {
@@ -387,7 +414,14 @@ export default function ClassroomPage() {
 
     try {
       const startTime = Date.now();
-      const res = await queryRAG(
+      const botMsgId = crypto.randomUUID();
+      const botMsg: AugmentedMessage = { id: botMsgId, role: 'assistant', content: '' };
+      setMessages(prev => [...prev, botMsg]);
+
+      let fullContent = '';
+      let sources: RAGSource[] = [];
+
+      const stream = queryRAGStream(
         q || '',
         String(classroom?.collectionName || ''),
         String(classroom?.teacherId || ''),
@@ -395,29 +429,59 @@ export default function ClassroomPage() {
         chatScope === 'file' ? selectedFile?.id : undefined,
         imageBase64
       );
+
+      for await (const chunk of stream) {
+        if (chunk.includes('[METADATA]')) {
+          const parts = chunk.split('[METADATA]');
+          fullContent += parts[0];
+          try {
+            const meta = JSON.parse(parts[1]);
+            sources = meta.sources || [];
+          } catch (e) { console.warn('Metadata parse failed', e); }
+        } else if (chunk.includes('[ERROR]')) {
+          const errorMsg = chunk.split('[ERROR]')[1];
+          fullContent += `\nError: ${errorMsg}`;
+        } else {
+          fullContent += chunk;
+        }
+
+        // Clean content for display (strip out the <CITATIONS> block and any partial tags)
+        const displayContent = fullContent.replace(/<CITATIONS>[\s\S]*$/gi, '').trim();
+
+        // Update UI with current chunk
+        setMessages(prev => prev.map(m => 
+          m.id === botMsgId ? { 
+            ...m, 
+            content: displayContent, 
+            sources: sources.length ? sources : m.sources,
+            isStreaming: true 
+          } : m
+        ));
+      }
+
+      const finalDisplayContent = fullContent.replace(/<CITATIONS>[\s\S]*$/gi, '').trim();
+      
+      // Update UI with final content
+      setMessages(prev => prev.map(m => 
+        m.id === botMsgId ? { ...m, content: finalDisplayContent, sources: sources.length ? sources : m.sources, isStreaming: false } : m
+      ));
+
       const responseMs = Date.now() - startTime;
       
-      const botMsg: AugmentedMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: typeof res.answer === 'string' ? res.answer : JSON.stringify(res.answer),
-        sources: res.sources,
-      };
-      setMessages(prev => [...prev, botMsg]);
-
-      // Persist assistant message to backend
+      // Persist assistant message to backend (save cleaned version for UI, raw for logs if needed)
       if (sessionId) {
-        studentApi.appendChatMessage(sessionId, 'assistant', botMsg.content, res.sources).catch(() => {});
+        studentApi.appendChatMessage(sessionId, 'assistant', finalDisplayContent, sources).catch(() => {});
       }
 
       // ── Backend Logging ──
       studentApi.logQuery({
         question: q || 'Image Analysis',
-        answer: botMsg.content,
+        answer: fullContent,
         subjectId: classId,
         fileId: chatScope === 'file' ? selectedFile?.id : undefined,
         responseMs,
-        chunkCount: res.sources?.length,
+        chunkCount: sources.length,
+
         topic: (extractTopics(q || '') || [])[0],
       }).catch(e => console.error('Failed to log query to backend:', e));
 
@@ -820,6 +884,16 @@ export default function ClassroomPage() {
                                 ? 'bg-red-50 border-red-200 text-red-600 rounded-tl-sm' 
                                 : 'bg-white border-slate-100 text-slate-700 rounded-tl-sm'
                           }`}>
+                            {msg.role === 'assistant' && !msg.content && !msg.isError && (
+                              <div className="flex items-center gap-3 py-2 px-1">
+                                <div className="flex gap-1">
+                                  <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0 }} className="w-2 h-2 rounded-full bg-blue-500" />
+                                  <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.2 }} className="w-2 h-2 rounded-full bg-blue-500" />
+                                  <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.4 }} className="w-2 h-2 rounded-full bg-blue-500" />
+                                </div>
+                                <span className="text-xs font-black text-blue-500 uppercase tracking-widest italic animate-pulse">Assistant is thinking...</span>
+                              </div>
+                            )}
                             <MarkdownContent
                               content={msg.content}
                               role={msg.role}
@@ -883,16 +957,6 @@ export default function ClassroomPage() {
                         </div>
                       </motion.div>
                     ))
-                  )}
-                  {sending && (
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex gap-4">
-                      <div className="shrink-0 w-9 h-9 rounded-2xl flex items-center justify-center bg-white border border-slate-100 text-blue-400">
-                        <Bot size={18} />
-                      </div>
-                      <div className="px-6 py-4 rounded-3xl rounded-tl-sm bg-white border border-slate-100 flex items-center gap-2 shadow-sm">
-                        {[0,1,2].map(i => <div key={i} className="w-2 h-2 rounded-full bg-blue-200 animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />)}
-                      </div>
-                    </motion.div>
                   )}
                   <div ref={chatEndRef} />
                 </div>

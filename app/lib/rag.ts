@@ -28,19 +28,19 @@ export interface RAGQueryResponse {
   sources: RAGSource[];
 }
 
-export async function queryRAG(
+export async function* queryRAGStream(
   question: string,
   collectionName: string,
   teacherId: string,
   history: ChatMessage[] = [],
   fileId?: string,
   imageBase64?: string,
-): Promise<RAGQueryResponse> {
+): AsyncGenerator<string> {
   const scopedQuestion = fileId
     ? `[Context: Only answer from the file with id ${fileId}] ${question}`
     : question;
 
-  const res = await fetch(`${RAG_API}/query`, {
+  const res = await fetch(`${RAG_API}/query-stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -48,7 +48,7 @@ export async function queryRAG(
       collection_name: collectionName,
       question:        scopedQuestion,
       image_base64:    imageBase64,
-      top_k:           6,
+      top_k:           8,
       chat_history:    history.slice(-8),
     }),
   });
@@ -57,5 +57,15 @@ export async function queryRAG(
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail ?? 'RAG query failed');
   }
-  return res.json();
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No reader available');
+
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    yield decoder.decode(value, { stream: true });
+  }
 }
+
