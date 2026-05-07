@@ -117,35 +117,57 @@ async def health():
     return {"status": "ok", "service": "TeachAI RAG", "version": "1.0.0"}
 
 
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form
+import os
+import shutil
+import tempfile
+
 @app.post("/ingest", response_model=IngestResponse)
-async def ingest_file(req: IngestRequest):
+async def ingest_file(
+    teacher_id: str = Form(...),
+    collection_name: str = Form(...),
+    file_id: str = Form(...),
+    file_name: str = Form(...),
+    is_assignment: bool = Form(False),
+    file: UploadFile = File(...)
+):
     """
     Parse and embed a teacher's file into their private Qdrant collection.
-    This is called by the NestJS backend after a successful file upload.
+    Accepts the actual file via multipart/form-data.
     """
+    temp_path = None
     try:
+        # 1. Save uploaded file to a temporary location
+        suffix = os.path.splitext(file_name)[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            temp_path = tmp.name
+
+        # 2. Ingest
         engine = get_engine()
         result = await engine.ingest_file(
-            teacher_id=req.teacher_id,
-            collection_name=req.collection_name,
-            file_id=req.file_id,
-            file_path=req.file_path,
-            file_name=req.file_name,
-            is_assignment=req.is_assignment,
+            teacher_id=teacher_id,
+            collection_name=collection_name,
+            file_id=file_id,
+            file_path=temp_path, # Pass the temp path
+            file_name=file_name,
+            is_assignment=is_assignment,
         )
         return IngestResponse(
             success=True,
             chunks_added=result["chunks_added"],
             file_id=result["file_id"],
-            message=f"Successfully ingested {result['chunks_added']} chunks from '{req.file_name}'",
+            message=f"Successfully ingested {result['chunks_added']} chunks from '{file_name}'",
         )
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"Ingest error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+    finally:
+        # 3. Clean up temp file
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except: pass
 
 
 @app.post("/query", response_model=QueryResponse)
