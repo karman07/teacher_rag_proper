@@ -15,6 +15,7 @@ import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import FormData from 'form-data';
 
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'https://teacheraiai.parteekbhatia.com';
 
@@ -526,14 +527,18 @@ export class KnowledgeBaseService {
         data: { status: FileStatus.processing },
       });
 
-      const response = await axios.post(`${RAG_SERVICE_URL}/ingest`, {
-        teacher_id: teacherId,
-        collection_name: collectionName,
-        file_id: fileId,
-        file_path: storagePath,
-        file_name: originalName,
-        is_assignment: isAssignment,
-      }, { timeout: 600_000 }); // 10 min for large video files
+      const formData = new FormData();
+      formData.append('teacher_id', teacherId);
+      formData.append('collection_name', collectionName);
+      formData.append('file_id', fileId);
+      formData.append('file_name', originalName);
+      formData.append('is_assignment', String(isAssignment));
+      formData.append('file', fs.createReadStream(storagePath));
+
+      const response = await axios.post(`${RAG_SERVICE_URL}/ingest`, formData, {
+        headers: formData.getHeaders(),
+        timeout: 600_000,
+      });
 
       // Mark ready with chunk count
       await this.prisma.knowledgeFile.update({
