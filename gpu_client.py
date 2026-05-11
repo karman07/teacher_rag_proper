@@ -24,7 +24,11 @@ class GPUClient:
             self._http = httpx.AsyncClient(
                 base_url=self._gateway,
                 timeout=httpx.Timeout(300.0, connect=15.0),
-                headers={"Accept-Encoding": "identity"}
+                limits=httpx.Limits(max_keepalive_connections=0),
+                headers={
+                    "Accept-Encoding": "identity",
+                    "Connection": "close"
+                }
             )
         return self._http
 

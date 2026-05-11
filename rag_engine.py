@@ -295,39 +295,28 @@ class RAGEngine:
         return content
 
     async def _youtube_audio_fallback(self, url, file_name):
-        def _download():
-            import yt_dlp
-            tmp_dir = tempfile.mkdtemp()
-            ydl_opts = {'format':'bestaudio[ext=m4a]/bestaudio/best','outtmpl':os.path.join(tmp_dir,'%(id)s.%(ext)s'),'quiet':True}
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                return os.path.join(tmp_dir, f"{info['id']}.{info.get('ext','m4a')}")
-        audio_path = await asyncio.to_thread(_download)
+        import httpx
         try:
-            desc = await self._transcribe_audio(audio_path)
-            return f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Whisper)]\n{desc}"
-        finally:
-            if os.path.exists(audio_path):
-                os.remove(audio_path)
+            async with httpx.AsyncClient(timeout=300) as client:
+                res = await client.post(
+                    f"{self.gpu._gateway.rstrip('/')}/transcribe", 
+                    json={"url": url}
+                )
+                res.raise_for_status()
+                data = res.json()
+                if data.get("success"):
+                    desc = data.get("text", "")
+                    return f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Whisper)]\n{desc}"
+                else:
+                    logger.warning(f"[youtube] Gateway whisper failed: {data}")
+                    return ""
+        except Exception as e:
+            logger.error(f"[youtube] Gateway whisper error: {e}")
+            return ""
 
     # ── Delete ────────────────────────────────────────────────────────────
 
-    def delete_file_chunks(self, *, collection_name, file_id) -> dict:
-        import asyncio as _aio
-        try:
-            loop = _aio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(_aio.run, self._async_delete(collection_name, file_id))
-                    return future.result()
-            else:
-                return _aio.run(self._async_delete(collection_name, file_id))
-        except Exception as e:
-            logger.warning(f"[delete] failed: {e}")
-            return {"deleted": False}
-
-    async def _async_delete(self, collection_name, file_id):
+    async def delete_file_chunks(self, *, collection_name, file_id) -> dict:
         try:
             await self.gpu.qdrant_delete(collection_name, {
                 "must": [{"key": "file_id", "match": {"value": file_id}}]
@@ -335,7 +324,7 @@ class RAGEngine:
             logger.info(f"[delete] chunks removed for file {file_id}")
             return {"deleted": True}
         except Exception as e:
-            logger.warning(f"[delete] {collection_name} error: {e}")
+            logger.warning(f"[delete] failed: {e}")
             return {"deleted": False}
 
     # ── Query ─────────────────────────────────────────────────────────────
@@ -559,9 +548,10 @@ Knowledge Base Context:
             })
 
         # 3. Build prompt (same as query)
-        context = ""
+        context_parts = []
         for i, res in enumerate(retrieved_chunks, 1):
-            context += f"CHUNK {i}:\n{res['chunk']}\n\n"
+            context_parts.append(f"[Source {i}: {res['file_name']} | chunk {res['chunk_idx']}]\n{res['chunk']}")
+        context = "\n\n---\n\n".join(context_parts)
 
         assignment_protocol = ""
         if any(c.get("is_assignment") for c in retrieved_chunks):
@@ -660,7 +650,7 @@ Knowledge Base Context:
                 else: ht = cq
             sources.append({
                 "file_id": item["file_id"], "file_name": item["file_name"],
-                "relevance": round(item["score"], 3),
+                "relevance": round(1 - item["distance"], 3),
                 "chunk_idx": item["chunk_idx"] if item["chunk_idx"] >= 0 else None,
                 "page": page_val if page_val >= 0 else None,
                 "image_index": item["image_index"] if item["image_index"] >= 0 else None,

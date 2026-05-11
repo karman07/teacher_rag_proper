@@ -117,6 +117,47 @@ async def health():
     return {"status": "ok", "service": "TeachAI RAG", "version": "1.0.0"}
 
 
+class TranscribeRequest(BaseModel):
+    url: str
+
+class TranscribeResponse(BaseModel):
+    success: bool
+    text: str
+    segments: list
+
+_whisper_model = None
+
+@app.post("/transcribe", response_model=TranscribeResponse)
+async def transcribe_audio_route(req: TranscribeRequest):
+    """
+    Standalone endpoint to download and transcribe YouTube audio directly.
+    Fully independent of rag_engine — can be called via HTTP from anywhere.
+    """
+    import httpx
+    from config import get_settings
+    
+    cfg = get_settings()
+    gateway_url = getattr(cfg, "gpu_gateway_url", "https://ai-backend-66976dwa2.brevlab.com")
+    
+    try:
+        async with httpx.AsyncClient(timeout=300) as client:
+            resp = await client.post(
+                f"{gateway_url.rstrip('/')}/transcribe",
+                json={"url": req.url}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return TranscribeResponse(
+                success=data.get("success", True),
+                text=data.get("text", ""),
+                segments=data.get("segments", [])
+            )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Gateway transcription failed: {str(e)}")
+
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form
 import os
 import shutil
@@ -243,7 +284,7 @@ async def delete_file_chunks(file_id: str, req: DeleteRequest):
     """
     try:
         engine = get_engine()
-        result = engine.delete_file_chunks(
+        result = await engine.delete_file_chunks(
             collection_name=req.collection_name,
             file_id=req.file_id,
         )
