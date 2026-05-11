@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, ZoomIn, ZoomOut, X, Download, Image as ImageIcon, FileDigit, Scissors, Sparkles, Bot, Edit3, Trash2, Video, Music } from 'lucide-react';
+import { FileText, ZoomIn, ZoomOut, X, Download, ExternalLink, Image as ImageIcon, FileDigit, Scissors, Sparkles, Bot, Edit3, Trash2, Video, Music } from 'lucide-react';
 import { Viewer, Worker } from '@react-pdf-viewer/core';
 import type { RenderPage, RenderPageProps } from '@react-pdf-viewer/core';
 import { highlightPlugin, RenderHighlightTargetProps, RenderHighlightContentProps } from '@react-pdf-viewer/highlight';
@@ -709,7 +709,7 @@ export default function PDFViewer({
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm relative">
       <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-slate-100 bg-slate-50/80 z-20">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2 rounded-xl bg-blue-100 text-blue-600 shrink-0">
+          <div className={`p-2 rounded-xl shrink-0 ${isYouTube ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-blue-600'}`}>
             {isYouTube || isVideo ? <Video size={16} /> : isAudio ? <Music size={16} /> : isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
           </div>
           <div className="min-w-0">
@@ -741,9 +741,15 @@ export default function PDFViewer({
             </div>
           )}
 
-          <button onClick={() => window.open(authenticatedUrl, '_blank')} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 transition-colors" title="Download">
-            <Download size={15} />
-          </button>
+          {isYouTube && originalName ? (
+            <button onClick={() => window.open(originalName, '_blank')} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-500 transition-colors" title="Open on YouTube">
+              <ExternalLink size={15} />
+            </button>
+          ) : (
+            <button onClick={() => window.open(authenticatedUrl, '_blank')} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 transition-colors" title="Download">
+              <Download size={15} />
+            </button>
+          )}
           {onClose && (
             <button onClick={onClose} className="p-2 rounded-lg bg-red-50 border border-red-100 text-red-400 hover:bg-red-500 hover:text-white transition-all" title="Close">
               <X size={15} />

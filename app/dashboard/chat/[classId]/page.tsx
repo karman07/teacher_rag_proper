@@ -567,8 +567,9 @@ export default function ClassroomPage() {
           </div>
         ) : filteredFiles.map((file: any) => {
           const active = selectedFile?.id === file.id;
-          const name = file.displayName || file.originalName || file.name || 'Untitled';
-          const sizeMB = file.sizeBytes ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : '';
+          const isYT = file.source === 'youtube';
+          const name = file.displayName || (isYT ? 'YouTube Video' : (file.originalName || file.name || 'Untitled'));
+          const sizeMB = file.sizeBytes && !isYT ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : '';
           return (
             <button
               key={file.id}
@@ -577,8 +578,8 @@ export default function ClassroomPage() {
                 active ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-800 hover:border-slate-300'
               }`}
             >
-              <div className={`p-2.5 rounded-xl shrink-0 ${active ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
-                {file.mimeType?.includes('video') || file.source === 'youtube' ? <Video size={18} /> : 
+              <div className={`p-2.5 rounded-xl shrink-0 ${active ? 'bg-white/20 text-white' : isYT ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                {file.mimeType?.includes('video') || isYT ? <Video size={18} /> : 
                  file.mimeType?.includes('image') ? <ImageIcon size={18} /> : 
                  file.mimeType?.includes('audio') ? <Music size={18} /> : 
                  <FileText size={18} />}
@@ -587,8 +588,13 @@ export default function ClassroomPage() {
                 <p className="text-sm font-bold truncate">{name}</p>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   <p className={`text-[10px] font-medium ${active ? 'text-blue-100' : 'text-slate-500'}`}>
-                    {sizeMB} {file.mimeType ? `• ${file.mimeType.split('/')[1]?.toUpperCase()}` : ''}
+                    {isYT ? '' : sizeMB} {isYT ? '' : file.mimeType ? `• ${file.mimeType.split('/')[1]?.toUpperCase()}` : ''}
                   </p>
+                  {isYT && (
+                    <div className={`px-1.5 py-0.5 rounded border ${active ? 'bg-white/20 border-white/20 text-white' : 'bg-red-50 border-red-100 text-red-500'} text-[8px] font-black uppercase tracking-wider flex items-center gap-1`}>
+                      <Video size={8} /> YouTube
+                    </div>
+                  )}
                   {file.isAssignment && (
                     <div className={`px-1.5 py-0.5 rounded border ${active ? 'bg-white/20 border-white/20 text-white' : 'bg-amber-50 border-amber-100 text-amber-600'} text-[8px] font-black uppercase tracking-wider flex items-center gap-1`}>
                       <Sparkles size={8} /> Assignment
@@ -933,6 +939,12 @@ export default function ClassroomPage() {
                                           {src.page && (
                                             <span className="shrink-0 text-[9px] font-black text-slate-400 bg-slate-100 group-hover:bg-amber-100 group-hover:text-amber-700 px-1.5 py-0.5 rounded transition-colors">
                                               Page {src.page}
+                                            </span>
+                                          )}
+                                          {src.timestamp && (
+                                            <span className="shrink-0 text-[9px] font-black text-red-500 bg-red-50 group-hover:bg-red-100 group-hover:text-red-700 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1">
+                                              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                              {src.timestamp}
                                             </span>
                                           )}
                                           {src.relevance && (
