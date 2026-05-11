@@ -305,8 +305,17 @@ class RAGEngine:
                 res.raise_for_status()
                 data = res.json()
                 if data.get("success"):
-                    desc = data.get("text", "")
-                    return f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Whisper)]\n{desc}"
+                    segments = data.get("segments", [])
+                    content = f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Whisper)]\n"
+                    if segments:
+                        for seg in segments:
+                            start = seg.get("start", 0)
+                            m, s = divmod(start, 60)
+                            h, m = divmod(m, 60)
+                            content += f"[{int(h):02d}:{int(m):02d}:{int(s):02d}] {seg.get('text', '')}\n"
+                    else:
+                        content += data.get("text", "")
+                    return content
                 else:
                     logger.warning(f"[youtube] Gateway whisper failed: {data}")
                     return ""
@@ -404,6 +413,7 @@ class RAGEngine:
 - Structure: Use Markdown (headers, bold, lists) to make the answer highly readable.
 - Detail: If the context allows, provide a thorough explanation. Do not be terse.
 - Citing: When mentioning a fact, cite it inline like (Source 1).
+- **Video timestamps**: If a chunk contains timestamps like [HH:MM:SS], include the most relevant timestamp in your answer as [MM:SS] or [HH:MM:SS] to help the student locate the exact moment.
 - **Formulas: Use standard LaTeX delimiters. Use $...$ for inline math and $$...$$ for block math.**
 
 ## ASSIGNMENT PROTOCOL
@@ -488,6 +498,15 @@ Knowledge Base Context:
                 s, e, et = self._find_quote_span(chunk, cq)
                 if et: ht, hs, he, snippet = et, s, e, et
                 else: ht = cq
+            # Extract first timestamp from YouTube chunks
+            timestamp = None
+            if item["content_type"] in ("youtube",):
+                ts_match = re.search(r'\[(\d{2}:\d{2}:\d{2})\]', chunk)
+                if ts_match:
+                    timestamp = ts_match.group(1)
+                    # Strip leading 00: for display (00:05:30 -> 05:30)
+                    if timestamp.startswith('00:'):
+                        timestamp = timestamp[3:]
             sources.append({
                 "file_id": item["file_id"], "file_name": item["file_name"],
                 "relevance": round(1 - item["distance"], 3),
@@ -497,6 +516,7 @@ Knowledge Base Context:
                 "content_type": item["content_type"], "snippet": snippet,
                 "highlight_text": ht, "highlight_start": hs, "highlight_end": he,
                 "y_offset": item["y_offset"],
+                "timestamp": timestamp,
             })
         return {"answer": answer, "sources": sources}
 
@@ -574,6 +594,7 @@ Knowledge Base Context:
 - Structure: Use Markdown (headers, bold, lists) to make the answer highly readable.
 - Detail: If the context allows, provide a thorough explanation. Do not be terse.
 - Citing: When mentioning a fact, cite it inline like (Source 1).
+- **Video timestamps**: If a chunk contains timestamps like [HH:MM:SS], include the most relevant timestamp in your answer as [MM:SS] or [HH:MM:SS] to help the student locate the exact moment.
 - **Formulas: Use standard LaTeX delimiters. Use $...$ for inline math and $$...$$ for block math.**
 
 ## ASSIGNMENT PROTOCOL
@@ -648,6 +669,14 @@ Knowledge Base Context:
                 s, e, et = self._find_quote_span(chunk, cq)
                 if et: ht, hs, he, snippet = et, s, e, et
                 else: ht = cq
+            # Extract first timestamp from YouTube chunks
+            timestamp = None
+            if item["content_type"] in ("youtube",):
+                ts_match = re.search(r'\[(\d{2}:\d{2}:\d{2})\]', chunk)
+                if ts_match:
+                    timestamp = ts_match.group(1)
+                    if timestamp.startswith('00:'):
+                        timestamp = timestamp[3:]
             sources.append({
                 "file_id": item["file_id"], "file_name": item["file_name"],
                 "relevance": round(1 - item["distance"], 3),
@@ -657,6 +686,7 @@ Knowledge Base Context:
                 "content_type": item["content_type"], "snippet": snippet,
                 "highlight_text": ht, "highlight_start": hs, "highlight_end": he,
                 "y_offset": item["y_offset"],
+                "timestamp": timestamp,
             })
         
         yield f"\n[METADATA]{json.dumps({'sources': sources})}"
