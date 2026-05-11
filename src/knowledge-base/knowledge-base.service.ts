@@ -414,7 +414,7 @@ export class KnowledgeBaseService {
       const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
       if (subject) collectionNameYt = subject.collectionName;
     }
-    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameYt, destPath, dto.url, dbFile.isAssignment);
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameYt, destPath, fileName, dbFile.isAssignment);
 
     return {
       ...dbFile,
@@ -533,11 +533,24 @@ export class KnowledgeBaseService {
       formData.append('file_id', fileId);
       formData.append('file_name', originalName);
       formData.append('is_assignment', String(isAssignment));
-      formData.append('file', fs.createReadStream(storagePath));
+      formData.append('file', fs.createReadStream(storagePath), { filename: originalName });
+
+      const headers = formData.getHeaders();
+      const length = await new Promise<number | null>((resolve) => {
+        formData.getLength((err, len) => {
+          if (err) resolve(null);
+          else resolve(len);
+        });
+      });
+      if (length) {
+        headers['Content-Length'] = length;
+      }
 
       const response = await axios.post(`${RAG_SERVICE_URL}/ingest`, formData, {
-        headers: formData.getHeaders(),
+        headers,
         timeout: 600_000,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
       });
 
       // Mark ready with chunk count
@@ -552,12 +565,16 @@ export class KnowledgeBaseService {
       this.logger.log(
         `RAG ingested '${originalName}' → ${response.data?.chunks_added ?? 0} chunks`,
       );
-    } catch (err) {
-      this.logger.warn(`RAG ingestion failed for file ${fileId}: ${String(err)}`);
+    } catch (err: any) {
+      this.logger.warn(`RAG ingestion failed for file ${fileId}: ${err.message}`);
+      if (err.response?.data) {
+        this.logger.warn(`AI Backend Error Details: ${JSON.stringify(err.response.data)}`);
+      }
       await this.prisma.knowledgeFile.update({
         where: { id: fileId },
         data: { status: FileStatus.error },
       }).catch(() => { });
+
     }
   }
 
