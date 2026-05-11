@@ -134,6 +134,9 @@ export class StudentsService {
                 displayName: true,
                 mimeType: true,
                 sizeBytes: true,
+                source: true,
+                isAssignment: true,
+                tags: true,
                 createdAt: true,
                 storagePath: true,
               }

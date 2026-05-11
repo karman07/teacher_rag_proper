@@ -392,11 +392,24 @@ export class KnowledgeBaseService {
 
     fs.writeFileSync(destPath, dto.url);
 
+    // Fetch the video title via YouTube's free oEmbed API
+    let videoTitle: string | null = null;
+    try {
+      const oembedRes = await axios.get(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(dto.url)}&format=json`,
+        { timeout: 5000 },
+      );
+      videoTitle = oembedRes.data?.title || null;
+    } catch {
+      this.logger.warn(`Could not fetch YouTube title for ${dto.url}`);
+    }
+
     const dbFile = await this.prisma.knowledgeFile.create({
       data: {
         teacherId,
         name: fileName,
         originalName: dto.url,
+        displayName: videoTitle,
         mimeType: 'text/plain',
         sizeBytes: BigInt(dto.url.length),
         storagePath: destPath,
@@ -473,14 +486,25 @@ export class KnowledgeBaseService {
       },
     });
 
-    // If subject or assignment status changed, re-ingest
+    // If subject or assignment status changed, re-ingest into new collection
     if ((data.subjectId !== undefined && data.subjectId !== file.subjectId) || (data.isAssignment !== undefined && data.isAssignment !== file.isAssignment)) {
+      // 1. Delete chunks from the OLD collection first
+      let oldCollectionName = (await this.ensureKnowledgeBase(teacherId)).collectionName;
+      if (file.subjectId) {
+        const oldSub = await this.prisma.subject.findUnique({ where: { id: file.subjectId } });
+        if (oldSub) oldCollectionName = oldSub.collectionName;
+      }
+      axios.delete(`${RAG_SERVICE_URL}/files/${fileId}`, {
+        data: { collection_name: oldCollectionName, file_id: fileId },
+      }).catch(() => { }); // Non-blocking
+
+      // 2. Re-ingest into the NEW collection
       let collectionName = (await this.ensureKnowledgeBase(teacherId)).collectionName;
       if (data.subjectId && data.subjectId !== 'all') {
         const sub = await this.prisma.subject.findUnique({ where: { id: data.subjectId } });
         if (sub) collectionName = sub.collectionName;
       }
-      this.triggerRagIngestion(updated.id, teacherId, collectionName, updated.storagePath, updated.originalName, updated.isAssignment);
+      this.triggerRagIngestion(updated.id, teacherId, collectionName, updated.storagePath, updated.name, updated.isAssignment);
     }
 
     return { ...updated, sizeBytes: Number(updated.sizeBytes) };
