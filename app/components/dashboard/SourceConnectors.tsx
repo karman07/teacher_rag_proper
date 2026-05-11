@@ -44,9 +44,9 @@ const S3Icon = () => (
   </svg>
 );
 
-const YoutubeIcon = () => (
+const YouTubeIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#FF0000">
-    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.5 12 3.5 12 3.5s-7.505 0-9.377.55a3.016 3.016 0 0 0-2.122 2.136C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.55 9.376.55 9.376.55s7.505 0 9.377-.55a3.016 3.016 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
   </svg>
 );
 
@@ -69,8 +69,8 @@ const SOURCES = [
   {
     id: 'youtube',
     name: 'YouTube',
-    description: 'Import video transcripts directly',
-    icon: <YoutubeIcon />,
+    description: 'Import video transcripts automatically',
+    icon: <YouTubeIcon />,
     available: true,
   },
   {
@@ -251,7 +251,7 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
   };
 
   const handleYoutubeImport = async () => {
-    if (!ytUrl) {
+    if (!ytUrl.trim()) {
       alert('Please enter a YouTube URL');
       return;
     }
@@ -259,12 +259,13 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
     setLoading('youtube');
     try {
       const result = await knowledgeBaseApi.importFromYoutube({
-        url: ytUrl,
+        url: ytUrl.trim(),
         subjectId: subjectId,
       });
       onImportComplete(result);
       setSuccessId('youtube');
       setYtModalOpen(false);
+      setYtUrl('');
       setTimeout(() => setSuccessId(null), 3000);
     } catch (err: any) {
       alert(`YouTube Import failed: ${err.message}`);
@@ -396,12 +397,12 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
         </ModalContent>
       </Modal>
 
-      {/* YouTube Modal */}
+      {/* YouTube Config Modal */}
       <Modal isOpen={ytModalOpen} onClose={() => setYtModalOpen(false)} size="md">
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <YoutubeIcon />
+              <YouTubeIcon />
               <span className="font-black text-xl">Import YouTube Video</span>
             </div>
             <p className="text-xs text-slate-500 font-medium">We'll extract and index the video's transcript automatically.</p>
@@ -415,11 +416,12 @@ export default function SourceConnectors({ onImportComplete, subjectId }: Props)
                 value={ytUrl}
                 onChange={e => setYtUrl(e.target.value)}
               />
+
             </div>
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setYtModalOpen(false)} className="font-bold">Cancel</Button>
-            <Button color="danger" onPress={handleYoutubeImport} isLoading={loading === 'youtube'} className="font-black">Import Transcript</Button>
+            <Button color="primary" onPress={handleYoutubeImport} isLoading={loading === 'youtube'} className="font-black bg-red-600 border border-red-700">Import Video</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

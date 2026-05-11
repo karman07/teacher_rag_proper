@@ -165,6 +165,7 @@ export const knowledgeBaseApi = {
     return data;
   },
 
+
   deleteFile: async (fileId: string): Promise<void> => {
     const res = await fetch(`${API}/knowledge-base/files/${fileId}`, {
       method: 'DELETE',
