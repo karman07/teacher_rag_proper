@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import FormData from 'form-data';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL ?? 'https://teacheraiai.parteekbhatia.com';
 
@@ -385,12 +386,27 @@ export class KnowledgeBaseService {
   async handleYoutubeImport(teacherId: string, dto: UploadYoutubeDto) {
     await this.ensureKnowledgeBase(teacherId);
 
-    const fileName = `${uuidv4()}.youtube`;
     const teacherDir = path.join(this.uploadsRoot, teacherId);
     fs.mkdirSync(teacherDir, { recursive: true });
-    const destPath = path.join(teacherDir, fileName);
 
-    fs.writeFileSync(destPath, dto.url);
+    // Fetch transcript on our side so the RAG service gets plain text
+    let transcriptText: string;
+    try {
+      const segments = await YoutubeTranscript.fetchTranscript(dto.url);
+      transcriptText = segments.map(s => s.text).join(' ').trim();
+      if (!transcriptText) {
+        throw new Error('Empty transcript returned');
+      }
+    } catch (err: any) {
+      throw new BadRequestException(
+        `Could not fetch YouTube transcript: ${err.message}. Ensure the video has captions enabled.`,
+      );
+    }
+
+    // Save transcript as plain text
+    const fileName = `${uuidv4()}.txt`;
+    const destPath = path.join(teacherDir, fileName);
+    fs.writeFileSync(destPath, transcriptText, 'utf8');
 
     // Fetch the video title via YouTube's free oEmbed API
     let videoTitle: string | null = null;
@@ -411,7 +427,7 @@ export class KnowledgeBaseService {
         originalName: dto.url,
         displayName: videoTitle,
         mimeType: 'text/plain',
-        sizeBytes: BigInt(dto.url.length),
+        sizeBytes: BigInt(Buffer.byteLength(transcriptText, 'utf8')),
         storagePath: destPath,
         source: FileSource.youtube,
         status: FileStatus.ready,
@@ -427,7 +443,7 @@ export class KnowledgeBaseService {
       const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
       if (subject) collectionNameYt = subject.collectionName;
     }
-    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameYt, destPath, fileName, dbFile.isAssignment);
+    this.triggerRagIngestion(dbFile.id, teacherId, collectionNameYt, destPath, videoTitle ?? dto.url, dbFile.isAssignment);
 
     return {
       ...dbFile,
