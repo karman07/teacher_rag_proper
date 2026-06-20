@@ -174,7 +174,7 @@ function LoginContent() {
           </form>
 
           <p className="mt-8 text-center text-sm font-medium" style={{ color: "var(--muted)" }}>
-            New to AI Study Assistant?{' '}
+            New to VTA?{' '}
             <Link href="/signup" className="font-bold hover:underline" style={{ color: "var(--primary)" }}>
               Create account
             </Link>

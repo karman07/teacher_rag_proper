@@ -10,8 +10,8 @@ const font = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AI Study Assistant | Student Portal",
-  description: "Join your classroom and learn with AI assistance",
+  title: "VTA — Student Portal",
+  description: "Your AI-powered virtual teaching assistant — get instant answers from your course materials.",
 };
 
 export default function RootLayout({
@@ -22,9 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nAnmC9Wl7iGHhYd84S7vqiPBAb9B9D79wX770NadZsn93W69mG78l2p0N0sXp3M9" crossorigin="anonymous" />
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-S991pU8ERD9AtL9zC6U+7/O/Kx0Oa5Xv+Zz7wD0H7r08pEwY0N0sXp3M9" crossorigin="anonymous"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-+XBljXPPiv+OzfbB3cVmWlf48b7tXU/r57yC+6V0u25O0sXp3M9" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nAnmC9Wl7iGHhYd84S7vqiPBAb9B9D79wX770NadZsn93W69mG78l2p0N0sXp3M9" crossOrigin="anonymous" />
+        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-S991pU8ERD9AtL9zC6U+7/O/Kx0Oa5Xv+Zz7wD0H7r08pEwY0N0sXp3M9" crossOrigin="anonymous"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-+XBljXPPiv+OzfbB3cVmWlf48b7tXU/r57yC+6V0u25O0sXp3M9" crossOrigin="anonymous"></script>
         <script dangerouslySetInnerHTML={{
           __html: `
             window.addEventListener('load', function() {

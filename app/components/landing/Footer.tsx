@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GraduationCap } from 'lucide-react';
+import Image from 'next/image';
 
 // Inline SVG social icons (brand icons not in lucide-react)
 function GithubIcon({ size = 16 }: { size?: number }) {
@@ -34,22 +34,14 @@ const SOCIAL = [
 
 const FOOTER_LINKS = {
   Product: [
-    { label: 'Features', href: '#features' },
-    { label: 'How it Works', href: '#how-it-works' },
-    { label: 'Pricing', href: '#pricing' },
+    { label: 'Features', href: '/#features' },
+    { label: 'How it Works', href: '/#how-it-works' },
+    { label: 'FAQ', href: '/#faq' },
   ],
-  Resources: [
-    { label: 'Documentation', href: '/docs' },
-    { label: 'Guides', href: '/guides' },
-    { label: 'Blog', href: '/blog' },
-  ],
-  Company: [
-    { label: 'About', href: '/about' },
-    { label: 'Contact', href: '/contact' },
-  ],
-  Legal: [
-    { label: 'Privacy Policy', href: '/privacy' },
-    { label: 'Terms of Service', href: '/terms' },
+  Account: [
+    { label: 'Sign In', href: '/login' },
+    { label: 'Create Account', href: '/signup' },
+    { label: 'My Dashboard', href: '/dashboard' },
   ],
 };
 
@@ -62,20 +54,32 @@ export default function Footer() {
     <footer className="bg-white border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top */}
-        <div className="py-16 grid grid-cols-2 md:grid-cols-6 gap-10">
+        <div className="py-16 grid grid-cols-2 md:grid-cols-4 gap-10">
           {/* Brand column */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-500/30">
-                <GraduationCap size={16} className="text-white fill-white" />
-              </div>
+              <Image src="/light_logo.png" alt="VTA" width={32} height={32} className="rounded-lg" />
               <span className="font-bold text-xl text-slate-900">
-                Study <span className="text-blue-600">Assistant</span>
+                VTA
               </span>
             </Link>
             <p className="text-sm text-slate-500 leading-relaxed max-w-xs mb-6">
-              A smarter way to study. Get instant answers from your own course materials—with sources you can trust.
+              AI-powered virtual teaching assistant. Get instant answers from your own course materials—with sources you can trust.
             </p>
+            <div className="space-y-3 mb-8">
+              <div className="flex items-center gap-3 text-sm text-slate-500">
+                <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">📞</span>
+                +91-8813-947793
+              </div>
+              <div className="flex items-center gap-3 text-sm text-slate-500">
+                <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">📧</span>
+                parteek.bhatia@gmail.com
+              </div>
+              <div className="flex items-center gap-3 text-sm text-slate-500">
+                <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">📍</span>
+                A-30 Max Heights Sonepat Haryana
+              </div>
+            </div>
             <div className="flex gap-3">
               {SOCIAL.map(({ label, href, Icon }) => (
                 <a
@@ -117,7 +121,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="py-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-400">
-            &copy; {year} AI Study Assistant. All rights reserved.
+            &copy; {year} VTA — Virtual Teaching Assistant. All rights reserved.
           </p>
           <p className="text-xs text-slate-400">
             Made to help students learn better.

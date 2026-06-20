@@ -7,7 +7,7 @@ import SectionHeader from '../common/SectionHeader';
 
 const FAQS = [
   {
-    question: "What can I do with Study Assistant?",
+    question: "What can I do with VTA?",
     answer: "You can ask questions from your class notes, PDFs, and lecture material, then get clear answers with source-backed references so you can verify where each answer came from."
   },
   {
@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     question: "Do I need technical knowledge to use it?",
-    answer: "No technical setup is required. If you can type a question, you can use Study Assistant effectively."
+    answer: "No technical setup is required. If you can type a question, you can use VTA effectively."
   },
   {
     question: "Can I use it for exam prep?",
@@ -47,7 +47,7 @@ export default function FAQSection() {
         <SectionHeader
           badge="FAQ"
           title={<>Frequently Asked <span className="text-blue-600">Questions</span></>}
-          subtitle="Everything you need to know about getting started with Study Assistant."
+          subtitle="Everything you need to know about getting started with VTA."
         />
 
         <motion.div

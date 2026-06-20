@@ -14,7 +14,8 @@ import {
   NavbarMenuItem,
   Tooltip
 } from '@heroui/react';
-import { GraduationCap, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
+import { LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 
@@ -48,17 +49,21 @@ export default function AppNavbar() {
         <NavbarBrand className="gap-3">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <div className="absolute inset-0 bg-blue-500/20 blur-lg rounded-full group-hover:bg-blue-500/40 transition-all duration-500" />
-              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-300">
-                <GraduationCap size={20} className="text-white fill-white" />
-              </div>
+              <div className="absolute inset-0 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 bg-blue-500/20" />
+              <Image
+                src="/light_logo.png"
+                alt="VTA"
+                width={40}
+                height={40}
+                className="relative rounded-xl group-hover:scale-105 transition-transform duration-300"
+              />
             </div>
             <div className="flex flex-col -gap-1">
               <p className="font-extrabold text-xl text-slate-900 tracking-tight flex items-baseline">
-                Study <span className="text-blue-600 font-black ml-1">Assistant</span>
+                VTA
               </p>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">
-                AI For Your Courses
+                Student Portal
               </span>
             </div>
           </Link>

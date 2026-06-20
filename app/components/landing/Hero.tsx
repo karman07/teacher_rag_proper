@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import { motion } from "framer-motion";
 import { Button } from "@heroui/react";
-import { ArrowRight, Clock, CheckCircle2, FileText, Sparkles, Search, Bot, ArrowUpRight, UploadCloud } from "lucide-react";
+import { ArrowRight, Clock, CheckCircle2, FileText, Sparkles } from "lucide-react";
 import Container from "../common/Container";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
@@ -45,137 +46,6 @@ function useTypewriter(words: string[], speed = 75, pause = 2200) {
   }, [displayText, isDeleting, wordIndex, words, speed, pause]);
 
   return displayText;
-}
-
-/* ── Hero Mockup Animation ─────────────────────────────── */
-function HeroMockup() {
-  const [step, setStep] = useState(0);
-
-  useEffect(() => {
-    const timer1 = setTimeout(() => setStep(1), 800);
-    const timer2 = setTimeout(() => setStep(2), 2000);
-    const timer3 = setTimeout(() => setStep(3), 4000);
-    return () => { clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); };
-  }, []);
-
-  return (
-    <div className="relative group perspective-[2000px] animate-float" style={{ animationDelay: "0.2s" }}>
-      <div className="absolute -inset-4 bg-gradient-to-br from-blue-500/20 via-indigo-500/20 to-purple-500/20 rounded-[3rem] blur-2xl opacity-70 group-hover:opacity-100 transition duration-1000" />
-      
-      <motion.div 
-        initial={{ rotateX: 5, rotateY: -5 }}
-        animate={{ rotateX: 0, rotateY: 0 }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
-        className="relative rounded-[2.5rem] border border-white/40 shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl flex flex-col transform-gpu"
-      >
-        {/* Browser Top Bar */}
-        <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6 bg-white/60">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-400" />
-            <div className="w-3 h-3 rounded-full bg-amber-400" />
-            <div className="w-3 h-3 rounded-full bg-emerald-400" />
-          </div>
-          <div className="flex-1 px-4">
-            <div className="mx-auto max-w-[240px] h-7 bg-slate-100/80 rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-500 border border-slate-200/60">
-              <Sparkles size={12} className="text-blue-500 mr-1.5" />
-              studyassistant.ai/session
-            </div>
-          </div>
-          <div className="w-16" /> {/* spacer */}
-        </div>
-
-        <div className="p-8 pb-0 flex-1 min-h-[420px] flex flex-col gap-6">
-          <AnimatePresence>
-            {step >= 1 && (
-              <motion.div
-                key="hero-user-question"
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="flex justify-end"
-              >
-                <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-md max-w-[85%]">
-                  <p className="text-[14px] font-medium leading-relaxed">
-                    Can you summarize the main causes of the French Revolution from my notes?
-                  </p>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 2 && (
-              <motion.div
-                key="hero-thinking-state"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex gap-3 items-center"
-              >
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-blue-600">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
-                  </div>
-                </div>
-                <p className="text-[12px] font-semibold text-slate-400 flex items-center gap-2">
-                  <Search size={12} /> Reading History_101_Notes.pdf...
-                </p>
-              </motion.div>
-            )}
-
-            {step >= 3 && (
-              <motion.div
-                key="hero-ai-response"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4 items-start"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shrink-0">
-                  <Bot size={20} />
-                </div>
-                <div className="flex-1 space-y-4">
-                  <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-sm p-5 shadow-sm">
-                    <p className="text-[14px] font-medium text-slate-700 leading-relaxed">
-                      Based on your notes, the main causes were social inequality, unfair taxation on the Third Estate, and the financial crisis worsened by the king's spending.
-                    </p>
-                  </div>
-                  
-                  {/* Citation Chip */}
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="inline-flex items-center gap-3 bg-white border border-blue-100 p-2.5 rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.08)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)] transition-all cursor-pointer"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center text-red-500 font-black text-[11px]">
-                      PDF
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-bold text-slate-900 leading-none mb-1">History_101_Notes.pdf</p>
-                      <p className="text-[10px] font-bold text-blue-600 leading-none flex items-center gap-1">
-                        <CheckCircle2 size={10} /> Verified Source: Page 4
-                      </p>
-                    </div>
-                    <div className="ml-2 w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
-                      <ArrowUpRight size={14} />
-                    </div>
-                  </motion.div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Input Mockup */}
-        <div className="p-6 pt-2 bg-gradient-to-t from-white via-white to-transparent">
-          <div className="h-14 bg-white border border-slate-200/80 rounded-2xl px-5 flex items-center gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-            <UploadCloud size={18} className="text-slate-400" />
-            <div className="flex-1 text-[13px] font-medium text-slate-400">Ask a follow up question...</div>
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-              <ArrowRight size={16} />
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
 }
 
 /* --- Main Hero section --- */
@@ -269,7 +139,14 @@ export default function Hero() {
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
             className="relative hidden lg:block"
           >
-            <HeroMockup />
+            <Image
+              src="/banner_image.png"
+              alt="VTA banner"
+              width={600}
+              height={600}
+              className="w-full h-auto rounded-3xl shadow-2xl"
+              priority
+            />
           </motion.div>
         </div>
       </Container>
