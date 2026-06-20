@@ -8,7 +8,7 @@ import SectionHeader from './common/SectionHeader';
 const FAQS = [
   {
     question: "How long does setup take?",
-    answer: "Setup takes less than 5 minutes. You simply upload your course PDFs, slides, or connect your Google Drive folder, and TeachAI instantly starts learning your curriculum."
+    answer: "Setup takes less than 5 minutes. You simply upload your course PDFs, slides, or connect your Google Drive folder, and VTA instantly starts learning your curriculum."
   },
   {
     question: "Do students need to create accounts?",
@@ -20,7 +20,7 @@ const FAQS = [
   },
   {
     question: "Can this integrate with our LMS?",
-    answer: "Yes, TeachAI supports seamless integrations with major Learning Management Systems like Canvas, Moodle, and Blackboard, ensuring a unified experience for students."
+    answer: "Yes, VTA supports seamless integrations with major Learning Management Systems like Canvas, Moodle, and Blackboard, ensuring a unified experience for students."
   }
 ];
 
@@ -31,7 +31,7 @@ export default function FAQSection() {
         <SectionHeader
           badge="FAQ"
           title={<>Frequently Asked <span className="text-blue-600 dark:text-blue-400">Questions</span></>}
-          subtitle="Everything you need to know about getting started with TeachAI."
+          subtitle="Everything you need to know about getting started with VTA."
         />
 
         <motion.div

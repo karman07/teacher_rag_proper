@@ -61,7 +61,7 @@ export default function LoginPage() {
     <AuthShell>
       <AuthCard
         title="Welcome back, Teacher"
-        subtitle="Sign in to your Multimodal Teacher account to continue"
+        subtitle="Sign in to your VTA Educator account to continue"
         footer={
           <div className="flex flex-col gap-4">
             <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-2">
@@ -165,7 +165,7 @@ export default function LoginPage() {
               </a>
             </div>
 
-            <AuthSubmitButton label="Sign in to Multimodal Teacher" isLoading={loading} />
+            <AuthSubmitButton label="Sign in to VTA" isLoading={loading} />
           </form>
 
           {/* Divider */}

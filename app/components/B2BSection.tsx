@@ -11,7 +11,7 @@ const BENEFITS = [
   {
     icon: Building2,
     title: "Scalable Across Departments",
-    description: "Easily deploy TeachAI across your entire institution. Centralized billing and management for IT teams."
+    description: "Easily deploy VTA across your entire institution. Centralized billing and management for IT teams."
   },
   {
     icon: Shield,
@@ -39,7 +39,7 @@ export default function B2BSection() {
           >
             <SectionHeader
               badge="For Institutions"
-              title={<>Deploy TeachAI at <span className="text-blue-600 dark:text-blue-400">Scale</span></>}
+              title={<>Deploy VTA at <span className="text-blue-600 dark:text-blue-400">Scale</span></>}
               subtitle="Empower your faculty with the tools they need to succeed, while maintaining complete control over data and security."
               centered={false}
             />

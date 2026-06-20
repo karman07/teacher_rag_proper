@@ -5,9 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar } from '@heroui/react';
+import Image from 'next/image';
 import {
   LayoutDashboard, FolderOpen, BarChart3, MessageCircle,
-  LogOut, Sun, Moon, Menu, X, Cpu, BookOpen, Users
+  LogOut, Sun, Moon, Menu, X, BookOpen, Users
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -46,16 +47,19 @@ function SidebarContent({
       <div className="flex-shrink-0 px-4 pt-5 pb-4"
         style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: COLORS.primary[600] }}>
-            <Cpu size={14} className="text-white" />
-          </div>
+          <Image
+            src={theme === 'dark' ? '/dark-logo.png' : '/light_logo.png'}
+            alt="VTA"
+            width={28}
+            height={28}
+            className="rounded-lg flex-shrink-0"
+          />
           <div>
             <p className="text-[13px] font-black tracking-tight" style={{ color: bodyText }}>
-              Multimodal Teacher
+              VTA
             </p>
             <p className="text-[10px]" style={{ color: mutedText }}>
-              AI-Powered Assistant
+              Educator Portal
             </p>
           </div>
         </div>
@@ -262,7 +266,7 @@ export default function DashboardLayout({ children }: Props) {
           >
             <Menu size={20} />
           </button>
-          <p className="text-[13px] font-black" style={{ color: 'var(--text)' }}>Multimodal Teacher</p>
+          <p className="text-[13px] font-black" style={{ color: 'var(--text)' }}>VTA</p>
         </div>
 
         {/* Page */}

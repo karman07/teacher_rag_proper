@@ -14,7 +14,8 @@ import {
   NavbarMenuItem,
   Tooltip
 } from '@heroui/react';
-import { Zap, Sun, Moon, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
+import { Sun, Moon, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
 import { COLORS } from '../constants/colors';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -51,17 +52,21 @@ export default function AppNavbar() {
         <NavbarBrand className="gap-3">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <div className="absolute inset-0 bg-primary-500/20 blur-lg rounded-full group-hover:bg-primary-500/40 transition-all duration-500" />
-              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-blue-600 flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform duration-300">
-                <Zap size={20} className="text-white fill-white" />
-              </div>
+              <div className="absolute inset-0 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 bg-primary-500/20" />
+              <Image
+                src={isDark ? '/dark-logo.png' : '/light_logo.png'}
+                alt="VTA"
+                width={40}
+                height={40}
+                className="relative rounded-xl group-hover:scale-105 transition-transform duration-300"
+              />
             </div>
             <div className="flex flex-col -gap-1">
               <p className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight flex items-baseline">
-                Multimodal <span className="text-primary-600 dark:text-primary-400 font-black ml-1">Teacher</span>
+                VTA
               </p>
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] leading-none">
-                AI-Powered Assistant
+                Educator Portal
               </span>
             </div>
           </Link>

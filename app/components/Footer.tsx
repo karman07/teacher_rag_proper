@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
+import Image from 'next/image';
 
 // Inline SVG social icons (brand icons not in lucide-react)
 function GithubIcon({ size = 16 }: { size?: number }) {
@@ -34,28 +34,26 @@ const SOCIAL = [
 
 const FOOTER_LINKS = {
   Product: [
-    { label: 'Features', href: '#features' },
-    { label: 'How it Works', href: '#how-it-works' },
-    { label: 'Pricing', href: '#pricing' },
-    { label: "What's New", href: '/changelog' },
+    { label: 'Features', href: '/#features' },
+    { label: 'How it Works', href: '/#how-it-works' },
+    { label: 'B2B / Institutions', href: '/#b2b' },
+    { label: 'FAQ', href: '/#faq' },
   ],
-  Resources: [
-    { label: 'Documentation', href: '/docs' },
-    { label: 'API Reference', href: '/docs/api' },
-    { label: 'Guides', href: '/guides' },
-    { label: 'Blog', href: '/blog' },
+  Dashboard: [
+    { label: 'Overview', href: '/dashboard' },
+    { label: 'Ask AI', href: '/dashboard/chat' },
+    { label: 'Subjects', href: '/dashboard/subjects' },
+    { label: 'File Management', href: '/dashboard/files' },
+    { label: 'Students', href: '/dashboard/students' },
+    { label: 'Analytics', href: '/dashboard/analytics' },
   ],
-  Company: [
-    { label: 'About', href: '/about' },
-    { label: 'Careers', href: '/careers' },
-    { label: 'Contact', href: '/contact' },
-    { label: 'Press', href: '/press' },
+  Account: [
+    { label: 'Sign In', href: '/login' },
+    { label: 'Create Account', href: '/signup' },
   ],
   Legal: [
     { label: 'Privacy Policy', href: '/privacy' },
     { label: 'Terms of Service', href: '/terms' },
-    { label: 'Cookie Policy', href: '/cookies' },
-    { label: 'Security', href: '/security' },
   ],
 };
 
@@ -72,11 +70,10 @@ export default function Footer() {
           {/* Brand column */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-md shadow-blue-500/30">
-                <Zap size={16} className="text-white fill-white" />
-              </div>
+              <Image src="/light_logo.png" alt="VTA" width={32} height={32} className="rounded-lg block dark:hidden" />
+              <Image src="/dark-logo.png" alt="VTA" width={32} height={32} className="rounded-lg hidden dark:block" />
               <span className="font-bold text-xl text-slate-900 dark:text-white">
-                Multimodal <span className="text-blue-600 dark:text-blue-400">Teacher</span>
+                VTA
               </span>
             </Link>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mb-6">
@@ -89,7 +86,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
                 <span className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">📧</span>
-                karmansingharora01@gmail.com
+                parteek.bhatia@gmail.com
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
                 <span className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">📍</span>
@@ -137,7 +134,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="py-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            &copy; {year} Multimodal Teacher Inc. All rights reserved.
+            &copy; {year} VTA — Virtual Teaching Assistant. All rights reserved.
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500">
             Made with care for educators everywhere.

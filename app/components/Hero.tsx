@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Button } from "@heroui/react";
 import { ArrowRight, Play, Star, CheckCircle } from "lucide-react";
@@ -232,15 +233,6 @@ export default function Hero() {
               >
                 {user ? "Go to Dashboard" : "Start Free"}
               </Button>
-              <Button
-                as={Link}
-                href="/demo"
-                size="lg"
-                variant="bordered"
-                className="font-bold px-10 h-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-slate-900 dark:text-white"
-              >
-                Book a Demo
-              </Button>
             </div>
           </motion.div>
 
@@ -250,7 +242,14 @@ export default function Hero() {
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
             className="relative hidden lg:block"
           >
-            <ResearchCollaboratorMockup />
+            <Image
+              src="/banner_image.png"
+              alt="Teacher AI banner"
+              width={600}
+              height={600}
+              className="w-full h-auto rounded-3xl shadow-2xl"
+              priority
+            />
           </motion.div>
         </div>
       </Container>

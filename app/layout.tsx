@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Multimodal Teacher — AI-Powered Assistant",
+  title: "VTA — Virtual Teaching Assistant",
   description:
-    "Transform your teaching with intelligent RAG systems, critical analytics, and AI-powered Q&A built from your own course materials.",
+    "AI-powered virtual teaching assistant that learns from your course materials and answers student questions instantly.",
 };
 
 export default function RootLayout({

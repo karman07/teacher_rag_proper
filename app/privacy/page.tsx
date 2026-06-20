@@ -46,7 +46,7 @@ export default function PrivacyPolicyPage() {
           </h1>
           
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed mb-4">
-            At TeachAI, your privacy is our priority. We are committed to transparency about how we collect, use, and protect your personal information.
+            At VTA, your privacy is our priority. We are committed to transparency about how we collect, use, and protect your personal information.
           </p>
           
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -86,7 +86,7 @@ export default function PrivacyPolicyPage() {
         {/* Right: Actual Content */}
         <div className="md:col-span-9 space-y-20 max-w-3xl">
           <p className="text-slate-600 dark:text-slate-400 italic text-sm leading-relaxed border-l-4 border-primary/20 pl-6 py-2">
-            This policy outlines our commitment to your privacy regarding your use of the TeachAI platform and associated services.
+            This policy outlines our commitment to your privacy regarding your use of the VTA platform and associated services.
           </p>
 
           <section id="introduction">
@@ -97,7 +97,7 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">1. Introduction</h2>
             </div>
             <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
-              TeachAI respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website (regardless of where you visit it from) and tell you about your privacy rights and how the law protects you.
+              VTA respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website (regardless of where you visit it from) and tell you about your privacy rights and how the law protects you.
             </p>
           </section>
 
@@ -182,7 +182,7 @@ export default function PrivacyPolicyPage() {
 
       <footer className="mt-auto py-12 px-6 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-sm text-slate-500">© 2026 TeachAI. All rights reserved.</p>
+          <p className="text-sm text-slate-500">© 2026 VTA. All rights reserved.</p>
           <div className="flex items-center gap-8">
             <Link href="/terms" className="text-sm font-bold text-slate-600 hover:text-primary transition-colors">Terms of Service</Link>
             <Link href="/login" className="text-sm font-bold text-slate-600 hover:text-primary transition-colors">Sign In</Link>
