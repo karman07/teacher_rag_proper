@@ -13,6 +13,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { StudentsModule } from './students/students.module';
+import { YoutubeModule } from './youtube/youtube.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StudentsModule } from './students/students.module';
     ProductsModule,
     InventoryModule,
     StudentsModule,
+    YoutubeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
