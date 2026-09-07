@@ -3,16 +3,18 @@
 import React from 'react';
 import Link from 'next/link';
 import AppNavbar from '../components/Navbar';
-import { ChevronLeft, Scale, ShieldCheck, Mail, MapPin, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Database, Sparkles, FlaskConical, Trash2, UserCheck, Building2, Mail, ChevronRight } from 'lucide-react';
 import { COLORS } from '../constants/colors';
 import { Divider } from '@heroui/react';
 import SectionBadge from '../components/common/SectionBadge';
 
 const SECTIONS = [
-  { id: 'introduction', label: 'Introduction' },
-  { id: 'data-collection', label: 'Data Collection' },
-  { id: 'usage', label: 'How We Use Data' },
-  { id: 'security', label: 'Data Security' },
+  { id: 'information-we-collect', label: 'Information We Collect' },
+  { id: 'how-we-use', label: 'How We Use Information' },
+  { id: 'beta-notice', label: 'Beta-Version Notice' },
+  { id: 'retention', label: 'Data Retention & Deletion' },
+  { id: 'age', label: 'Age Requirement' },
+  { id: 'independent', label: 'Independent Platform' },
   { id: 'contact', label: 'Contact Us' },
 ];
 
@@ -25,10 +27,9 @@ export default function PrivacyPolicyPage() {
   return (
     <div className="relative min-h-screen flex flex-col bg-slate-50 dark:bg-[#03070f] overflow-x-hidden">
       <AppNavbar />
-      
+
       {/* --- Hero Header --- */}
       <div className="relative pt-20 pb-16 px-6 text-center">
-        {/* Background Patterns */}
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.05),transparent_70%)]" />
           <div className="grid-bg absolute inset-0 opacity-30" />
@@ -37,20 +38,20 @@ export default function PrivacyPolicyPage() {
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-center mb-8">
             <SectionBadge icon={<ShieldCheck size={14} />}>
-              PRIVACY & PROTECTION
+              BETA VERSION
             </SectionBadge>
           </div>
-          
+
           <h1 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-6">
             Privacy <span style={{ color: COLORS.primary[600] }}>Policy</span>
           </h1>
-          
+
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed mb-4">
-            At VTA, your privacy is our priority. We are committed to transparency about how we collect, use, and protect your personal information.
+            VTA — Virtual Teaching Assistant — is an independently hosted beta educational platform led by Dr. Parteek Kumar Bhatia. It is not connected to Washington State University&rsquo;s systems or to any learning management system.
           </p>
-          
+
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-            EFFECTIVE DATE: APRIL 10, 2026
+            EFFECTIVE DATE: SEPTEMBER 6, 2026
           </p>
         </div>
       </div>
@@ -59,12 +60,12 @@ export default function PrivacyPolicyPage() {
 
       {/* --- Content Section --- */}
       <div className="max-w-7xl mx-auto w-full px-6 py-16 grid grid-cols-1 md:grid-cols-12 gap-12">
-        
+
         {/* Left: Navigation */}
         <div className="md:col-span-3 hidden md:block">
           <div className="sticky top-24">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-8 items-center flex gap-2">
-              AGREEMENT SECTIONS
+              POLICY SECTIONS
             </h3>
             <div className="flex flex-col gap-1">
               {SECTIONS.map((s) => (
@@ -86,95 +87,165 @@ export default function PrivacyPolicyPage() {
         {/* Right: Actual Content */}
         <div className="md:col-span-9 space-y-20 max-w-3xl">
           <p className="text-slate-600 dark:text-slate-400 italic text-sm leading-relaxed border-l-4 border-primary/20 pl-6 py-2">
-            This policy outlines our commitment to your privacy regarding your use of the VTA platform and associated services.
+            This policy explains what information VTA collects and how it is used.
           </p>
 
-          <section id="introduction">
+          <section id="information-we-collect">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                <ShieldCheck size={20} />
+                <Database size={20} />
               </div>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">1. Introduction</h2>
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
-              VTA respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website (regardless of where you visit it from) and tell you about your privacy rights and how the law protects you.
-            </p>
-          </section>
-
-          <section id="data-collection">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                <Scale size={20} />
-              </div>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">2. Information We Collect</h2>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">1. Information We Collect</h2>
             </div>
             <div className="space-y-4">
               <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
-                We collect personal data from you in various ways, primarily to provide and improve our services.
+                When you use VTA, we may collect:
               </p>
               <ul className="space-y-4 text-slate-600 dark:text-slate-300 text-[17px] list-none">
                 <li className="flex gap-4">
                   <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span><strong>Identity Data:</strong> includes first name, last name, and role as a teacher or administrator.</span>
+                  <span>Your email address and sign-in information.</span>
                 </li>
                 <li className="flex gap-4">
                   <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span><strong>Contact Data:</strong> includes email address and educational institution details.</span>
+                  <span>Course materials uploaded by users.</span>
                 </li>
                 <li className="flex gap-4">
                   <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span><strong>Course Content:</strong> any documents or data you upload to be processed by our RAG system.</span>
+                  <span>Questions submitted by users and responses generated by VTA.</span>
+                </li>
+                <li className="flex gap-4">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  <span>Basic technical information needed to operate and improve the platform.</span>
                 </li>
               </ul>
             </div>
           </section>
 
-          <section id="usage">
+          <section id="how-we-use">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                <ChevronRight size={20} />
+                <Sparkles size={20} />
               </div>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">3. How We Use Data</h2>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">2. How We Use Information</h2>
+            </div>
+            <div className="space-y-4">
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
+                We use this information to:
+              </p>
+              <ul className="space-y-4 text-slate-600 dark:text-slate-300 text-[17px] list-none">
+                <li className="flex gap-4">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  <span>Create and manage user accounts.</span>
+                </li>
+                <li className="flex gap-4">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  <span>Generate responses based on uploaded course materials.</span>
+                </li>
+                <li className="flex gap-4">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  <span>Operate, evaluate, and improve VTA.</span>
+                </li>
+                <li className="flex gap-4">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  <span>Identify and resolve technical problems.</span>
+                </li>
+              </ul>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px] pt-2">
+                VTA may use third-party providers for authentication, website hosting, data storage, and AI processing.
+              </p>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px] font-semibold">
+                We do not sell personal information. Uploaded course materials are not used to train publicly available AI models.
+              </p>
+            </div>
+          </section>
+
+          <section id="beta-notice">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <FlaskConical size={20} />
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">3. Beta-Version Notice</h2>
+            </div>
+            <div className="space-y-4">
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
+                VTA is currently in beta. Its features may change, and its responses may not always be complete or accurate. Users should verify important information using the original course materials.
+              </p>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px] p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900">
+                Please do not upload passwords, financial information, medical records, Social Security numbers, confidential student records, or other sensitive information.
+              </p>
+            </div>
+          </section>
+
+          <section id="retention">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <Trash2 size={20} />
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">4. Data Retention and Deletion</h2>
             </div>
             <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
-              Most commonly, we will use your personal data to perform the contract we are about to enter into or have entered into with you. Specifically, this means processing your uploaded materials to provide accurate AI-driven insights and managing your account.
+              Information may be retained while your account is active or as needed to operate and evaluate the beta platform. You may contact us to request the deletion of your account or uploaded course materials.
             </p>
           </section>
 
-          <section id="security">
+          <section id="age">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                <ShieldCheck size={20} />
+                <UserCheck size={20} />
               </div>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">4. Data Security</h2>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">5. Age Requirement</h2>
             </div>
             <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
-              We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorized way, altered or disclosed. We use enterprise-grade encryption for all data at rest and in transit.
+              VTA is intended for higher-education and professional-learning use. Children under 13 may not create or use a VTA account.
             </p>
+          </section>
+
+          <section id="independent">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <Building2 size={20} />
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">6. Independent Platform</h2>
+            </div>
+            <div className="space-y-4">
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
+                VTA is not an official service of Washington State University. Dr. Kumar&rsquo;s university affiliation is provided for professional identification only.
+              </p>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
+                VTA was developed through research supported by the NVIDIA Academic Grant Program. NVIDIA does not operate VTA or control its data practices.
+              </p>
+            </div>
           </section>
 
           <section id="contact" className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Questions about our Privacy Policy?</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">7. Contact</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+              For privacy questions or deletion requests, contact:
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                <div className="p-3 rounded-xl bg-blue-500/10 text-blue-600">
+                  <UserCheck size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400">Contact</p>
+                  <p className="text-slate-900 dark:text-white font-bold text-sm">Dr. Parteek Kumar Bhatia</p>
+                </div>
+              </div>
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
                 <div className="p-3 rounded-xl bg-blue-500/10 text-blue-600">
                   <Mail size={20} />
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase text-slate-400">Email</p>
-                  <p className="text-slate-900 dark:text-white font-bold text-sm">privacy@teachai.io</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                <div className="p-3 rounded-xl bg-blue-500/10 text-blue-600">
-                  <MapPin size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase text-slate-400">Office</p>
-                  <p className="text-slate-900 dark:text-white font-bold text-sm">San Francisco, CA</p>
+                  <p className="text-slate-900 dark:text-white font-bold text-sm">parteek.kumar@gmail.com</p>
                 </div>
               </div>
             </div>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-6 leading-relaxed">
+              This policy may be updated as VTA develops. Updates will be posted on this page with a revised effective date.
+            </p>
           </section>
 
         </div>
