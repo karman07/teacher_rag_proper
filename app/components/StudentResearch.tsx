@@ -110,14 +110,14 @@ export default function StudentResearch() {
 
               <div className="flex flex-wrap gap-12 pt-6">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Primary Advisor</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Project Lead</p>
                   <p className="text-xl font-black text-slate-900">Dr. Parteek Kumar Bhatia</p>
                   <p className="text-sm font-bold text-slate-400">Associate Professor, WSU</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Collaboration Partners</p>
-                  <p className="text-xl font-black text-slate-900 italic">NVIDIA research</p>
-                  <p className="text-sm font-bold text-slate-400">DeepMind Compute Optimization</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Grant Support</p>
+                  <p className="text-xl font-black text-slate-900 italic">NVIDIA Academic Grant Program</p>
+                  <p className="text-sm font-bold text-slate-400">32,000 NVIDIA A100 GPU-hours</p>
                 </div>
               </div>
             </div>
@@ -138,14 +138,17 @@ export default function StudentResearch() {
                      />
                    </div>
                    <div>
-                     <p className="label-caps !text-blue-600 mb-1.5 font-black">Principal Advisor</p>
+                     <p className="label-caps !text-blue-600 mb-1.5 font-black">Project Lead</p>
                      <h3 className="text-xl font-black text-slate-900 leading-tight tracking-tight">Dr. Parteek Kumar Bhatia</h3>
                    </div>
                  </div>
 
                  <div className="space-y-6 text-sm leading-relaxed text-slate-500 font-medium">
                    <p>
-                     Special thanks to <strong>Dr. Parteek Kumar Bhatia</strong>, Associate Professor in the School of Electrical Engineering and Computer Science at <strong>Washington State University (WSU)</strong>.
+                     <strong>Dr. Parteek Kumar Bhatia</strong> is an Associate Professor in the School of Electrical Engineering and Computer Science at Washington State University, Pullman. He is the principal investigator of the NVIDIA-supported project <em>A Multimodal Mixture-of-Experts Framework for NVIDIA DLI &amp; University Classrooms</em>, which led to the development of VTA—Virtual Teaching Assistant.
+                   </p>
+                   <p>
+                     A Gold-Tier NVIDIA DLI Ambassador and recipient of the MeitY Young Faculty Research Fellowship, Dr. Bhatia has secured more than $246,000 in competitive research funding and published over 100 research papers.
                    </p>
                    <div className="pt-8 flex flex-wrap items-center justify-end gap-6 border-t border-slate-50">
                      <Link 
