@@ -1,8 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
@@ -20,7 +18,6 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -80,38 +77,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     persist(data.accessToken, data.user);
   }, []);
 
-  const loginWithGoogle = useCallback(async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const firebaseIdToken = await result.user.getIdToken();
-      
-      const res = await fetch(`${API}/students/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebaseIdToken }),
-      });
-      
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Backend sync failed');
-      }
-
-      const data = await res.json();
-      persist(data.accessToken, data.user);
-    } catch (error: any) {
-      console.error('Google sign-in flow error:', error);
-      throw error;
-    }
-  }, []);
-
   const logout = useCallback(async () => {
-    try { await firebaseSignOut(auth); } catch { /* ignore */ }
     clear();
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, isLoading, login, signup, loginWithGoogle, logout }),
-    [user?.id, token, isLoading, login, signup, loginWithGoogle, logout]
+    () => ({ user, token, isLoading, login, signup, logout }),
+    [user?.id, token, isLoading, login, signup, logout]
   );
 
   return (
