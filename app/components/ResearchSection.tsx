@@ -11,39 +11,39 @@ export default function ResearchSection() {
   return (
     <section id="research" className="py-24 bg-slate-50/50 dark:bg-[#080f1e]/50 border-y border-slate-100 dark:border-slate-800">
       <Container>
-        <SectionHeader 
-          badge="Built on Academic Excellence"
-          title={<>Sponsored by <span style={{ color: '#76B900' }}>NVIDIA</span> — Shaping Future Pedagogy</>}
-          subtitle="Our core engine is built on cutting-edge research, ensuring the highest standards of accuracy and reliability for your classroom."
+        <SectionHeader
+          badge="Built on Academic Research"
+          title={<>Supported by the <span style={{ color: '#76B900' }}>NVIDIA</span> Academic Grant Program</>}
+          subtitle="VTA — Virtual Teaching Assistant — was developed as an outcome of the NVIDIA-supported project, A Multimodal Mixture-of-Experts Framework for NVIDIA DLI & University Classrooms. The project received 32,000 NVIDIA A100 GPU-hours to support the research and development of AI-powered learning experiences for university classrooms and professional training."
         />
 
         <div className="grid lg:grid-cols-[1fr_400px] gap-12 mt-16 items-start">
           {/* Research Context */}
           <div className="space-y-8">
             <div className="grid sm:grid-cols-2 gap-6">
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -5 }}
                 className="p-8 rounded-[2.5rem] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl shadow-slate-200/40 dark:shadow-none"
               >
                 <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6 transition-transform group-hover:rotate-6">
                   <Microscope size={28} />
                 </div>
-                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">Zero Hallucinations</h3>
+                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">Grounded, Course-Specific Answers</h3>
                 <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
-                  We guarantee that students only receive answers based on the materials you upload. Every response includes precise citations back to your original documents.
+                  VTA is designed to generate answers grounded in instructor-provided course materials. Responses include citations to the relevant source documents, allowing students and instructors to review and verify the information.
                 </p>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -5 }}
                 className="p-8 rounded-[2.5rem] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl shadow-slate-200/40 dark:shadow-none"
               >
                 <div className="w-14 h-14 rounded-2xl bg-[#76B900]/10 flex items-center justify-center text-[#76B900] mb-6">
                    <Cpu size={28} />
                 </div>
-                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">NVIDIA Partnership</h3>
+                <h3 className="text-xl font-black mb-3 text-slate-900 dark:text-white">NVIDIA-Accelerated Development</h3>
                 <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
-                  Powered by NVIDIA's latest AI infrastructure, ensuring lightning-fast responses and the capability to process complex materials like recorded lectures and massive textbooks.
+                  NVIDIA A100 GPU resources supported the development and evaluation of VTA's AI capabilities, including the processing of educational resources such as lecture materials, presentations, documents, and other course content.
                 </p>
               </motion.div>
             </div>
@@ -53,29 +53,31 @@ export default function ResearchSection() {
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-4">
                   <Award className="text-blue-400" size={24} />
-                  <p className="label-caps !text-blue-400">Security & Reliability</p>
+                  <p className="label-caps !text-blue-400">Security, Reliability, and Transparency</p>
                 </div>
-                <h3 className="text-2xl font-black mb-6">Built for Educational Institutions</h3>
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-blue-400 font-bold mb-2">1. Absolute Data Isolation</h4>
+                    <h4 className="text-blue-400 font-bold mb-2">1. Classroom Data Isolation</h4>
                     <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                      Your materials are securely isolated per classroom. We never use your course content to train external public models.
+                      Course materials are isolated by classroom to prevent content from being shared across courses.
                     </p>
                   </div>
                   <div>
-                    <h4 className="text-blue-400 font-bold mb-2">2. Strict Material Adherence</h4>
+                    <h4 className="text-blue-400 font-bold mb-2">2. Course-Material Grounding</h4>
                     <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                      The AI is constrained to act solely as a teaching assistant based on your provided context, completely eliminating the risk of unverified external information.
+                      VTA is designed to prioritize instructor-provided materials when answering questions, reducing unsupported responses and keeping assistance aligned with the course context.
                     </p>
                   </div>
                   <div>
-                    <h4 className="text-blue-400 font-bold mb-2">3. Transparent Verification</h4>
+                    <h4 className="text-blue-400 font-bold mb-2">3. Verifiable Responses</h4>
                     <p className="text-sm text-slate-300 leading-relaxed font-medium">
-                      Every generated statement links back to a specific page or slide in your materials, making it easy for you and your students to verify the information.
+                      Answers include references to the supporting course materials whenever available, helping students and instructors verify information and return to the original learning resources.
                     </p>
                   </div>
                 </div>
+                <p className="text-xs text-slate-400 mt-8 pt-6 border-t border-slate-700/50">
+                  Research supported by the NVIDIA Academic Grant Program using NVIDIA A100 GPUs.
+                </p>
               </div>
             </div>
           </div>
@@ -96,20 +98,20 @@ export default function ResearchSection() {
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="label-caps !text-blue-600 mb-1">Principal Advisor</p>
+                  <p className="label-caps !text-blue-600 mb-1">Project Lead</p>
                   <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight">Dr. Parteek Kumar Bhatia</h3>
                 </div>
               </div>
 
               <div className="space-y-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
                 <p>
-                  Special thanks to <strong>Dr. Parteek Kumar Bhatia</strong>, Associate Professor in the School of Electrical Engineering and Computer Science at <strong>Washington State University (WSU)</strong>, Pullman, WA.
+                  <strong>Dr. Parteek Kumar Bhatia</strong> is an Associate Professor in the School of Electrical Engineering and Computer Science at Washington State University, Pullman. He is the principal investigator of the NVIDIA-supported project <em>A Multimodal Mixture-of-Experts Framework for NVIDIA DLI &amp; University Classrooms</em>, which led to the development of VTA—Virtual Teaching Assistant.
                 </p>
                 <p>
-                  Prior to joining WSU, he served as a Professor and Associate Dean at the <strong>Thapar Institute of Engineering and Technology</strong>. He has held visiting positions at <strong>Whitman College</strong> and <strong>Tel Aviv University</strong>.
+                  A Gold-Tier NVIDIA DLI Ambassador and recipient of the MeitY Young Faculty Research Fellowship, Dr. Bhatia has secured more than $246,000 in competitive research funding and published over 100 research papers.
                 </p>
                 <p className="text-xs bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 italic">
-                  "He is a recipient of the prestigious Young Faculty Research Fellowship from the Ministry of Electronics & IT, Government of India."
+                  He is the author of bestselling textbooks, including Machine Learning with Python and Data Mining and Data Warehousing, both published by Cambridge University Press. His online courses have reached more than 45,000 learners worldwide.
                 </p>
                 <div className="pt-6 flex flex-wrap items-center justify-between gap-4">
                    <Link 
