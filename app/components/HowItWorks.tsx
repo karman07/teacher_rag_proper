@@ -27,7 +27,7 @@ const STEPS = [
     icon: MessageSquare,
     title: 'Students Ask Questions',
     description: 'Students get 24/7 support with accurate answers based strictly on the materials you provided.',
-    tags: ['24/7 Support', 'Cited Sources', 'No Hallucinations'],
+    tags: ['24/7 Support', 'Cited Sources', 'Grounded Answers'],
   },
   {
     step: '04',

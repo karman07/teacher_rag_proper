@@ -8,7 +8,7 @@ import { Avatar } from '@heroui/react';
 import Image from 'next/image';
 import {
   LayoutDashboard, FolderOpen, BarChart3, MessageCircle,
-  LogOut, Sun, Moon, Menu, X, BookOpen, Users
+  LogOut, Sun, Moon, Menu, X, BookOpen, Users, FlaskConical
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -23,6 +23,7 @@ const NAV = [
   { label: 'Students',        href: '/dashboard/students',  icon: Users },
   { label: 'Analytics',       href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Ask AI',          href: '/dashboard/chat',      icon: MessageCircle },
+  { label: 'Research Study',  href: '/dashboard/study',     icon: FlaskConical },
 ];
 
 interface Props { children: React.ReactNode }

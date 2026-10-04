@@ -31,7 +31,7 @@ const FEATURES: Feature[] = [
     icon: Brain,
     title: 'AI Answers Student Questions Instantly',
     description:
-      'Students get accurate answers 24/7 based only on your approved materials. Zero hallucinations.',
+      'Students get accurate answers 24/7 based only on your approved materials. Every answer cites your uploaded materials.',
     iconBg: 'bg-violet-50 dark:bg-violet-900/20',
     iconColor: 'text-violet-600 dark:text-violet-400',
   },
