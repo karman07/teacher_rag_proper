@@ -7,6 +7,8 @@ import { studyApi, CitationSupport } from '@/app/lib/study';
 interface Props {
   messageId: string;
   hasCitations: boolean;
+  /** true when the student already rated this answer (e.g. in an earlier visit) */
+  alreadyRated?: boolean;
   onRated: (messageId: string) => void;
 }
 
@@ -17,11 +19,11 @@ const SUPPORT: { value: CitationSupport; label: string }[] = [
 ];
 
 /** Compact per-answer rating shown under an assistant message for consenting students. */
-export default function AnswerRating({ messageId, hasCitations, onRated }: Props) {
+export default function AnswerRating({ messageId, hasCitations, alreadyRated = false, onRated }: Props) {
   const [helpful, setHelpful] = useState(0);
   const [support, setSupport] = useState<CitationSupport | undefined>();
   const [comment, setComment] = useState('');
-  const [state, setState] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
+  const [state, setState] = useState<'idle' | 'saving' | 'done' | 'error'>(alreadyRated ? 'done' : 'idle');
 
   const submit = async () => {
     if (!helpful) return;

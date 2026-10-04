@@ -978,9 +978,11 @@ export default function ClassroomPage() {
 
                           {/* ── Study: per-answer rating (consenting students only) ── */}
                           {msg.role === 'assistant' && !msg.isError && !msg.isStreaming && msg.content && msg.dbId
-                            && studyStatus?.enabled && studyStatus.consent === 'agreed' && !ratedIds.has(msg.dbId) && (
+                            && studyStatus?.enabled && studyStatus.consent === 'agreed' && (
                             <AnswerRating
+                              key={msg.dbId}
                               messageId={msg.dbId}
+                              alreadyRated={ratedIds.has(msg.dbId)}
                               hasCitations={!!(msg.sources && msg.sources.length > 0)}
                               onRated={(id) => setRatedIds(prev => new Set(prev).add(id))}
                             />
