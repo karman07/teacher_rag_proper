@@ -27,7 +27,7 @@ const STEPS = [
     icon: FileSearch,
     title: 'Get answers with sources',
     description: 'See the answer instantly, highlighted with exactly where it came from.',
-    tags: ['Instant Answers', 'Verified Sources', 'No Hallucinations'],
+    tags: ['Instant Answers', 'Verified Sources', 'Grounded Answers'],
   },
 ];
 

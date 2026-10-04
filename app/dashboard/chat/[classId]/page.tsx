@@ -8,15 +8,22 @@ import {
   Database, MessageSquare, BookOpen, Sparkles,
   ChevronRight, X, Menu, Download, ExternalLink,
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight as ChevronRightIcon,
-  RotateCcw, Video, Image as ImageIcon, Music, History, Plus,
+  RotateCcw, Video, Image as ImageIcon, Music, History, Plus, ClipboardList,
 } from 'lucide-react';
 import { studentApi, incrementQuestionsAsked, ChatSession } from '@/app/lib/api';
 import { queryRAGStream, ChatMessage, RAGSource } from '@/app/lib/rag';
 import { saveQuestionRecord, extractTopics } from '@/app/lib/analytics';
 import dynamic from 'next/dynamic';
+import { studyApi, StudyStatus } from '@/app/lib/study';
+import StudyConsentModal from '@/app/components/study/StudyConsentModal';
+import AnswerRating from '@/app/components/study/AnswerRating';
+import StudySurveyModal from '@/app/components/study/StudySurveyModal';
 
 interface AugmentedMessage extends ChatMessage {
   id: string;
+  /** id of the persisted ChatMessage (needed to attach study ratings) */
+  dbId?: string;
+  isStreaming?: boolean;
   sources?: RAGSource[];
   isError?: boolean;
 }
@@ -312,6 +319,29 @@ export default function ClassroomPage() {
   const activeSessionRef = useRef<ChatSession | null>(null);
   activeSessionRef.current = activeSession;
 
+  // ── Research study mode (opt-in; see StudyConsentModal) ──
+  const [studyStatus, setStudyStatus] = useState<StudyStatus | null>(null);
+  const [ratedIds, setRatedIds] = useState<Set<string>>(new Set());
+  const [surveyOpen, setSurveyOpen] = useState(false);
+
+  const refreshStudy = useCallback(async () => {
+    try {
+      const status = await studyApi.status(classId);
+      setStudyStatus(status);
+      if (status.enabled && status.consent === 'agreed') {
+        setRatedIds(new Set(await studyApi.myRatings(classId)));
+      }
+    } catch {
+      setStudyStatus({ enabled: false }); // study mode is optional: never block the chat
+    }
+  }, [classId]);
+  useEffect(() => { refreshStudy(); }, [refreshStudy]);
+
+  const answerConsent = async (agreed: boolean) => {
+    await studyApi.consent(classId, agreed);
+    await refreshStudy();
+  };
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
 
@@ -366,6 +396,7 @@ export default function ClassroomPage() {
       const stored = await studentApi.getChatMessages(session.id);
       const loaded: AugmentedMessage[] = stored.map(m => ({
         id: m.id,
+        dbId: m.id,
         role: m.role as 'user' | 'assistant',
         content: m.content,
         sources: m.sources as RAGSource[] | undefined,
@@ -470,7 +501,12 @@ export default function ClassroomPage() {
       
       // Persist assistant message to backend (save cleaned version for UI, raw for logs if needed)
       if (sessionId) {
-        studentApi.appendChatMessage(sessionId, 'assistant', finalDisplayContent, sources).catch(() => {});
+        studentApi.appendChatMessage(sessionId, 'assistant', finalDisplayContent, sources)
+          .then((saved: { id?: string }) => {
+            if (saved?.id) setMessages(prev => prev.map(m => (m.id === botMsgId ? { ...m, dbId: saved.id } : m)));
+            refreshStudy();
+          })
+          .catch(() => {});
       }
 
       // ── Backend Logging ──
@@ -676,6 +712,21 @@ export default function ClassroomPage() {
             <p className="text-sm font-bold text-slate-800">{classroom?.teacher?.name}</p>
           </div>
 
+          {studyStatus?.enabled && studyStatus.consent === 'agreed' && (
+            <button
+              onClick={() => setSurveyOpen(true)}
+              disabled={(studyStatus.answersReceived ?? 0) < (studyStatus.minAnswersBeforeSurvey ?? 5)
+                && !(studyStatus.surveysDone?.sus && studyStatus.surveysDone?.usefulness)}
+              className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={(studyStatus.answersReceived ?? 0) < (studyStatus.minAnswersBeforeSurvey ?? 5)
+                ? `The feedback survey unlocks after ${studyStatus.minAnswersBeforeSurvey ?? 5} answers (${studyStatus.answersReceived ?? 0} so far)`
+                : 'Share your feedback for the study'}
+            >
+              <ClipboardList size={14} />
+              <span className="hidden lg:inline">Study survey</span>
+            </button>
+          )}
+
           {/* New chat button in header */}
           <button
             onClick={startNewSession}
@@ -704,6 +755,18 @@ export default function ClassroomPage() {
           </button>
         </div>
       </header>
+
+      {studyStatus?.enabled && studyStatus.consent === 'pending' && (
+        <StudyConsentModal text={studyStatus.consentText || ''} onAnswer={answerConsent} />
+      )}
+      {surveyOpen && studyStatus?.surveysDone && (
+        <StudySurveyModal
+          subjectId={classId}
+          done={studyStatus.surveysDone}
+          onClose={() => setSurveyOpen(false)}
+          onSubmitted={() => refreshStudy()}
+        />
+      )}
 
       {/* Body */}
       <div className="flex-1 flex overflow-hidden">
@@ -912,6 +975,16 @@ export default function ClassroomPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* ── Study: per-answer rating (consenting students only) ── */}
+                          {msg.role === 'assistant' && !msg.isError && !msg.isStreaming && msg.content && msg.dbId
+                            && studyStatus?.enabled && studyStatus.consent === 'agreed' && !ratedIds.has(msg.dbId) && (
+                            <AnswerRating
+                              messageId={msg.dbId}
+                              hasCitations={!!(msg.sources && msg.sources.length > 0)}
+                              onRated={(id) => setRatedIds(prev => new Set(prev).add(id))}
+                            />
+                          )}
 
                           {/* ── Formal Sources Reference Panel ── */}
                           {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
