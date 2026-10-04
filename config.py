@@ -6,11 +6,9 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # ── GPU Gateway ────────────────────────────────────────────────────────
-    gpu_gateway_url: str = "https://8080-66976dwa2.brevlab.com"
-
     # ── Local paths ────────────────────────────────────────────────────────
     uploads_root: str = "../backend/uploads"
+    qdrant_path: str = "./qdrant_data"
 
     # ── Service ────────────────────────────────────────────────────────────
     rag_host: str = "0.0.0.0"
@@ -22,14 +20,18 @@ class Settings(BaseSettings):
     pdf_min_image_area: int = 40000
     pdf_vision_concurrency: int = 4
 
-    # ── Models (served by the GPU cluster) ─────────────────────────────────
-    llm_model_name: str = "llama70b"
-    vision_model_name: str = "qwen-vl"
-
-    # ── Gemini (OpenAI-compatible). When gemini_api_key is set it replaces the
-    #    GPU cluster LLM + vision models; embeddings/Qdrant still use the gateway.
+    # ── Gemini (OpenAI-compatible endpoint) ────────────────────────────────
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    llm_model_name: str = "gemini-2.5-flash-lite"
+    vision_model_name: str = "gemini-2.5-flash-lite"
+    rerank_model_name: str = ""          # defaults to llm_model_name
+    embed_model_name: str = "gemini-embedding-001"
+    embed_dim: int = 768
+
+    # ── Retrieval ──────────────────────────────────────────────────────────
+    retrieve_k: int = 20                 # candidates from dense search
+    final_k: int = 6                     # passages kept after reranking
 
     class Config:
         env_file = ".env"

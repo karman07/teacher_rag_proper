@@ -1,11 +1,11 @@
 """
-rag_engine.py — Per-teacher RAG using GPU cluster (Llama 3.3 + Qdrant)
+rag_engine.py — Per-teacher RAG using Gemini + embedded Qdrant
 """
-import os, re, io, json, asyncio, base64, hashlib, logging, tempfile
+import os, re, io, json, time, asyncio, base64, hashlib, logging, tempfile
 from typing import Optional
 from config import get_settings
 from document_parser import parse_document
-from gpu_client import GPUClient
+from gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 CHUNK_SIZE = 800
@@ -21,16 +21,18 @@ VISION_PROMPT = (
 class RAGEngine:
     def __init__(self):
         cfg = get_settings()
-        self.gpu = GPUClient(
-            cfg.gpu_gateway_url, cfg.llm_model_name, cfg.vision_model_name,
-            cfg.gemini_base_url, cfg.gemini_api_key,
+        self.gpu = GeminiClient(
+            cfg.gemini_api_key, cfg.gemini_base_url, cfg.llm_model_name, cfg.vision_model_name,
+            cfg.embed_model_name, cfg.embed_dim, cfg.rerank_model_name, cfg.qdrant_path,
         )
+        self._retrieve_k = cfg.retrieve_k
+        self._final_k = cfg.final_k
         self._uploads_root = cfg.uploads_root
         self._pdf_max_pages = cfg.pdf_max_pages
         self._pdf_max_images_per_page = cfg.pdf_max_images_per_page
         self._pdf_min_image_area = cfg.pdf_min_image_area
         self._pdf_vision_concurrency = cfg.pdf_vision_concurrency
-        logger.info("RAGEngine initialised — GPU cluster mode")
+        logger.info("RAGEngine initialised — Gemini mode")
 
     # ── Chunking ──────────────────────────────────────────────────────────
 
@@ -238,7 +240,7 @@ class RAGEngine:
             raise ValueError(f"No chunkable content for {file_name}")
 
         logger.info(f"[ingest] {len(chunk_records)} chunks from '{file_name}'")
-        await self.gpu.qdrant_ensure_collection(collection_name, vector_size=1024)
+        await self.gpu.qdrant_ensure_collection(collection_name)
 
         # Embed and upsert in batches
         batch_size = 32
@@ -254,7 +256,7 @@ class RAGEngine:
                     "vector": vector,
                     "payload": {
                         "file_id": file_id, "file_name": file_name, "teacher_id": teacher_id,
-                        "is_assignment": str(is_assignment).lower(),
+                        "is_assignment": bool(is_assignment),
                         "content_type": unit.get("kind", "text"), "chunk_idx": idx,
                         "page": int(unit.get("page") or -1),
                         "image_index": int(unit.get("image_index") or -1),
@@ -298,32 +300,23 @@ class RAGEngine:
         return content
 
     async def _youtube_audio_fallback(self, url, file_name):
-        import httpx
+        """No captions available: download audio with yt-dlp and transcribe locally."""
+        def _download(tmpdir):
+            import yt_dlp
+            opts = {"format": "bestaudio/best", "outtmpl": os.path.join(tmpdir, "audio.%(ext)s"),
+                    "quiet": True, "noplaylist": True}
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                return ydl.prepare_filename(info)
         try:
-            async with httpx.AsyncClient(timeout=300) as client:
-                res = await client.post(
-                    f"{self.gpu._gateway.rstrip('/')}/transcribe", 
-                    json={"url": url}
-                )
-                res.raise_for_status()
-                data = res.json()
-                if data.get("success"):
-                    segments = data.get("segments", [])
-                    content = f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Whisper)]\n"
-                    if segments:
-                        for seg in segments:
-                            start = seg.get("start", 0)
-                            m, s = divmod(start, 60)
-                            h, m = divmod(m, 60)
-                            content += f"[{int(h):02d}:{int(m):02d}:{int(s):02d}] {seg.get('text', '')}\n"
-                    else:
-                        content += data.get("text", "")
-                    return content
-                else:
-                    logger.warning(f"[youtube] Gateway whisper failed: {data}")
-                    return ""
+            with tempfile.TemporaryDirectory() as tmpdir:
+                audio_path = await asyncio.to_thread(_download, tmpdir)
+                transcript = await self._transcribe_audio(audio_path)
+            if not transcript:
+                return ""
+            return f"[Source: {file_name} (YouTube Video)]\n[Classification: YouTube Transcript (Whisper)]\n{transcript}\n"
         except Exception as e:
-            logger.error(f"[youtube] Gateway whisper error: {e}")
+            logger.error(f"[youtube] audio fallback failed: {e}")
             return ""
 
     # ── Delete ────────────────────────────────────────────────────────────
@@ -341,151 +334,135 @@ class RAGEngine:
 
     # ── Query ─────────────────────────────────────────────────────────────
 
-    async def query(self, *, teacher_id, collection_name, question, image_base64=None, top_k=8, chat_history=None) -> dict:
-        scope_pattern = r"^\[Context:\s*Only answer from the file with id\s+([a-f0-9-]+)\]\s*"
-        scope_match = re.match(scope_pattern, question, flags=re.IGNORECASE)
-        scoped_file_id = scope_match.group(1) if scope_match else None
-        effective_question = re.sub(scope_pattern, "", question, count=1, flags=re.IGNORECASE).strip() or question
+    _SCOPE_PATTERN = r"^\[Context:\s*Only answer from the file with id\s+([a-f0-9-]+)\]\s*"
 
-        logger.info(f"[query] teacher={teacher_id} scoped={scoped_file_id} q='{effective_question[:60]}...'")
+    def _split_scope(self, question: str):
+        m = re.match(self._SCOPE_PATTERN, question, flags=re.IGNORECASE)
+        scoped = m.group(1) if m else None
+        effective = re.sub(self._SCOPE_PATTERN, "", question, count=1, flags=re.IGNORECASE).strip() or question
+        return scoped, effective
 
-        # 1. Embed question
-        q_embedding = (await self.gpu.embed([effective_question]))[0]
+    async def retrieve(self, *, collection_name, question, scoped_file_id=None, top_k=None, rerank=True) -> dict:
+        """Dense top-N search followed by optional reranking down to top_k.
+        `reranked` is False when reranking was disabled or failed (the failure is reported, not hidden)."""
+        top_k = top_k or self._final_k
+        t0 = time.perf_counter()
+        q_embedding = (await self.gpu.embed([question]))[0]
+        t_embed = time.perf_counter()
 
-        # 2. Retrieve top-20 from Qdrant
-        qdrant_filter = None
-        if scoped_file_id:
-            qdrant_filter = {"must": [{"key": "file_id", "match": {"value": scoped_file_id}}]}
-        try:
-            results = await self.gpu.qdrant_search(collection_name, q_embedding, limit=20, filter_=qdrant_filter)
-        except Exception as e:
-            logger.error(f"[query] Qdrant search error: {e}", exc_info=True)
-            return {"answer": "Your knowledge base is empty. Please upload some files first.", "sources": []}
+        qfilter = {"must": [{"key": "file_id", "match": {"value": scoped_file_id}}]} if scoped_file_id else None
+        results = await self.gpu.qdrant_search(collection_name, q_embedding, limit=self._retrieve_k, filter_=qfilter)
+        t_search = time.perf_counter()
 
-        if not results:
-            msg = f"No context from file {scoped_file_id}." if scoped_file_id else "No relevant information found."
-            return {"answer": msg, "sources": []}
+        reranked, rerank_error, order = False, None, None
+        if results and rerank:
+            try:
+                ranked = await self.gpu.rerank(question, [r["payload"]["document"] for r in results], top_n=top_k)
+                order = [(r["index"], r["score"]) for r in ranked]
+                reranked = True
+            except Exception as e:
+                rerank_error = f"{type(e).__name__}: {e}"
+                logger.warning(f"[rerank] failed, falling back to dense order: {rerank_error}")
+        if order is None:
+            order = [(i, results[i]["score"]) for i in range(min(top_k, len(results)))]
+        t_rerank = time.perf_counter()
 
-        # 3. Rerank
-        docs_for_rerank = [r["payload"]["document"] for r in results]
-        try:
-            reranked = await self.gpu.rerank(effective_question, docs_for_rerank, top_n=top_k)
-            top_indices = [r["index"] for r in reranked]
-        except Exception as e:
-            logger.warning(f"[rerank] failed, using raw order: {e}")
-            top_indices = list(range(min(top_k, len(results))))
-
-        retrieved_chunks = []
-        for rank, idx in enumerate(top_indices, start=1):
-            r = results[idx]
-            p = r["payload"]
-            retrieved_chunks.append({
-                "source_index": rank, "chunk": p["document"], "distance": 1 - r["score"],
-                "file_id": p.get("file_id",""), "file_name": p.get("file_name","unknown"),
-                "chunk_idx": int(p.get("chunk_idx",-1)), "page": int(p.get("page",-1)),
-                "image_index": int(p.get("image_index",-1)), "content_type": p.get("content_type","unknown"),
-                "y_offset": float(p.get("y_offset",0.0)),
+        chunks = []
+        for rank, (idx, score) in enumerate(order, start=1):
+            p = results[idx]["payload"]
+            chunks.append({
+                "source_index": rank, "chunk": p["document"], "score": score,
+                "distance": 1 - results[idx]["score"],
+                "file_id": p.get("file_id", ""), "file_name": p.get("file_name", "unknown"),
+                "chunk_idx": int(p.get("chunk_idx", -1)), "page": int(p.get("page", -1)),
+                "image_index": int(p.get("image_index", -1)), "content_type": p.get("content_type", "unknown"),
+                "y_offset": float(p.get("y_offset", 0.0)),
+                "is_assignment": str(p.get("is_assignment", "false")).lower() == "true",
             })
+        return {
+            "chunks": chunks, "candidates": len(results), "reranked": reranked, "rerank_error": rerank_error,
+            "timings": {"embed_s": t_embed - t0, "search_s": t_search - t_embed, "rerank_s": t_rerank - t_search},
+        }
 
-        # 4. Build context
-        context_parts, is_assignment = [], False
-        for item in retrieved_chunks:
-            if item.get("is_assignment","") == "true":
-                is_assignment = True
-            context_parts.append(f"[Source {item['source_index']}: {item['file_name']} | chunk {item['chunk_idx']}]\n{item['chunk']}")
-        context = "\n\n---\n\n".join(context_parts)
+    @staticmethod
+    def _assignment_protocol(history) -> str:
+        """Graduated hints: the level rises with the number of student turns already in the session."""
+        prior_turns = sum(1 for m in (history or [])[-6:] if m.get("role") == "user")
+        level = min(3, 1 + prior_turns)
+        steps = {
+            1: "Level 1 (first request): explain only the underlying concept and restate what the problem is asking. Give no steps toward the answer.",
+            2: "Level 2 (student is still working): break the problem into sub-steps and name the technique to use. Do not carry out the steps.",
+            3: "Level 3 (repeated requests): show how to carry out the first step as a worked pattern on a different example, then ask the student to continue.",
+        }
+        return (
+            "\n## ASSIGNMENT PROTOCOL\n"
+            "The retrieved material comes from files the teacher marked as ASSIGNMENTS.\n"
+            "Never give the final answer or a submission-ready solution. Tutor with hints and probing questions.\n"
+            f"{steps[level]}\n"
+        )
 
-        assignment_protocol = ""
-        if is_assignment:
-            assignment_protocol = (
-                "\n## ASSIGNMENT PROTOCOL\n"
-                "Materials marked as ASSIGNMENTS: provide HINTS only, NOT solutions.\n"
-                "Guide step-by-step. Ask probing questions.\n"
-            )
-
+    def _build_system_prompt(self, chunks, history, *, tutoring=True, citations=True) -> str:
+        context = "\n\n---\n\n".join(
+            f"[Source {c['source_index']}: {c['file_name']} | chunk {c['chunk_idx']}]\n{c['chunk']}" for c in chunks)
+        assignment_protocol = self._assignment_protocol(history) if (tutoring and any(c["is_assignment"] for c in chunks)) else ""
         history_text = ""
-        if chat_history:
-            for msg in chat_history[-6:]:
-                role = "Student" if msg.get("role") == "user" else "Assistant"
-                history_text += f"{role}: {msg.get('content','')}\n"
-
-        system_prompt = f"""You are an elite Professor's AI Teaching Assistant. Your goal is to provide deep, insightful, and comprehensive explanations based STICTLY on the provided Knowledge Base.
+        for msg in (history or [])[-6:]:
+            role = "Student" if msg.get("role") == "user" else "Assistant"
+            history_text += f"{role}: {msg.get('content', '')}\n"
+        citations_block = """
+## CITATIONS BLOCK
+At the very end of your response, you MUST include a "CITATIONS" block in this EXACT JSON format:
+<CITATIONS>
+{"citations": [{"source": 1, "quote": "verbatim text"}]}
+</CITATIONS>
+Rules:
+- 'source' is the numeric CHUNK index.
+- 'quote' must be the EXACT verbatim text from that chunk.
+- Include 1-6 high-quality citations.
+""" if citations else ""
+        cite_line = "- Citing: When mentioning a fact, cite it inline like (Source 1).\n" if citations else ""
+        return f"""You are an elite Professor's AI Teaching Assistant. Your goal is to provide deep, insightful, and comprehensive explanations based STRICTLY on the provided Knowledge Base.
+If the Knowledge Base does not contain the answer, say that the information is not available in the course materials.
 
 ## RESPONSE GUIDELINES
 - Be Professorial: Use academic but accessible language. Provide context and "why" behind facts.
 - Structure: Use Markdown (headers, bold, lists) to make the answer highly readable.
 - Detail: If the context allows, provide a thorough explanation. Do not be terse.
-- Citing: When mentioning a fact, cite it inline like (Source 1).
-- **Video timestamps**: If a chunk contains timestamps like [HH:MM:SS], include the most relevant timestamp in your answer as [MM:SS] or [HH:MM:SS] to help the student locate the exact moment.
+{cite_line}- **Video timestamps**: If a chunk contains timestamps like [HH:MM:SS], include the most relevant timestamp in your answer as [MM:SS] or [HH:MM:SS] to help the student locate the exact moment.
 - **Formulas: Use standard LaTeX delimiters. Use $...$ for inline math and $$...$$ for block math.**
-
-## ASSIGNMENT PROTOCOL
-{assignment_protocol}
-
-## CITATIONS BLOCK
-At the very end of your response, you MUST include a "CITATIONS" block in this EXACT JSON format:
-<CITATIONS>
-{{"citations": [{{"source": 1, "quote": "verbatim text"}}]}}
-</CITATIONS>
-Rules: 
-- 'source' is the numeric CHUNK index.
-- 'quote' must be the EXACT verbatim text from that chunk.
-- Include 1-6 high-quality citations.
-
+{assignment_protocol}{citations_block}
 Conversation History:
 {history_text}
 
 Knowledge Base Context:
 {context}
 """
-        # 5. Generate
-        messages = [{"role": "system", "content": system_prompt}]
-        if image_base64:
-            header = "base64,"
-            if header in (image_base64 or ""):
-                image_base64 = image_base64.split(header)[1]
-            messages.append({"role": "user", "content": [
-                {"type": "text", "text": f"[Visual snippet provided for analysis]\nStudent Question: {effective_question}"},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
-            ]})
-            # Use vision model for image queries
-            raw = await self.gpu.describe_image(
-                base64.b64decode(image_base64), "image/png",
-                f"{system_prompt}\n\nStudent Question: {effective_question}"
-            )
-        else:
-            messages.append({"role": "user", "content": f"Student Question: {effective_question}"})
-            raw = await self.gpu.generate(messages, temperature=0.3)
 
-        # 6. Parse response and citations
-        answer = raw
-        model_citations = []
-        
-        if "<CITATIONS>" in raw and "</CITATIONS>" in raw:
-            parts = raw.split("<CITATIONS>")
-            answer = parts[0].strip()
-            citation_json = parts[1].split("</CITATIONS>")[0].strip()
-            payload = self._extract_json(citation_json)
-            if payload and isinstance(payload.get("citations"), list):
-                model_citations = payload["citations"]
+    def _parse_answer(self, raw: str):
+        if "<CITATIONS>" not in raw or "</CITATIONS>" not in raw:
+            return raw.split("<CITATIONS>")[0].strip(), []
+        answer = raw.split("<CITATIONS>")[0].strip()
+        payload = self._extract_json(raw.split("<CITATIONS>")[1].split("</CITATIONS>")[0].strip())
+        cites = payload["citations"] if payload and isinstance(payload.get("citations"), list) else []
+        return answer, cites
 
-        # 7. Build sources
+    def _build_sources(self, chunks, model_citations, effective_question) -> list[dict]:
         citation_lookup = {}
         for c in model_citations:
             if not isinstance(c, dict): continue
-            quote = str(c.get("quote","")).strip()
+            quote = str(c.get("quote", "")).strip()
             if not quote: continue
             sn = c.get("source")
             si = int(sn) if isinstance(sn, int) else (int(sn) if isinstance(sn, str) and sn.strip().isdigit() else None)
-            if si is None or si < 1 or si > len(retrieved_chunks): continue
-            src = retrieved_chunks[si-1]
+            if si is None or si < 1 or si > len(chunks): continue
+            src = chunks[si - 1]
             rk = (src["file_id"], src["chunk_idx"])
             if rk not in citation_lookup or len(quote) > len(citation_lookup[rk]):
                 citation_lookup[rk] = quote
 
         question_terms = set(re.findall(r"[a-z0-9]{4,}", effective_question.lower()))
         seen, sources = set(), []
-        for item in retrieved_chunks:
+        for item in chunks:
             rk = (item["file_id"], item["chunk_idx"])
             if rk in seen: continue
             seen.add(rk)
@@ -501,13 +478,11 @@ Knowledge Base Context:
                 s, e, et = self._find_quote_span(chunk, cq)
                 if et: ht, hs, he, snippet = et, s, e, et
                 else: ht = cq
-            # Extract first timestamp from YouTube chunks
             timestamp = None
-            if item["content_type"] in ("youtube",):
+            if item["content_type"] == "youtube":
                 ts_match = re.search(r'\[(\d{2}:\d{2}:\d{2})\]', chunk)
                 if ts_match:
                     timestamp = ts_match.group(1)
-                    # Strip leading 00: for display (00:05:30 -> 05:30)
                     if timestamp.startswith('00:'):
                         timestamp = timestamp[3:]
             sources.append({
@@ -518,180 +493,66 @@ Knowledge Base Context:
                 "image_index": item["image_index"] if item["image_index"] >= 0 else None,
                 "content_type": item["content_type"], "snippet": snippet,
                 "highlight_text": ht, "highlight_start": hs, "highlight_end": he,
-                "y_offset": item["y_offset"],
-                "timestamp": timestamp,
+                "y_offset": item["y_offset"], "timestamp": timestamp,
             })
-        return {"answer": answer, "sources": sources}
+        return sources
 
-    async def stream_query(self, *, teacher_id, collection_name, question, image_base64=None, top_k=8, chat_history=None):
-        import time
-        t_start = time.time()
+    async def query(self, *, teacher_id, collection_name, question, image_base64=None, top_k=None,
+                    chat_history=None, use_rerank=True, use_tutoring=True, use_citations=True) -> dict:
+        scoped_file_id, effective_question = self._split_scope(question)
+        logger.info(f"[query] teacher={teacher_id} scoped={scoped_file_id} q='{effective_question[:60]}...'")
+
+        r = await self.retrieve(collection_name=collection_name, question=effective_question,
+                                scoped_file_id=scoped_file_id, top_k=top_k, rerank=use_rerank)
+        chunks = r["chunks"]
+        if not chunks:
+            msg = f"No context from file {scoped_file_id}." if scoped_file_id else "No relevant information found."
+            return {"answer": msg, "sources": [], "meta": {**r, "chunks": []}}
+
+        system_prompt = self._build_system_prompt(chunks, chat_history, tutoring=use_tutoring, citations=use_citations)
+        t0 = time.perf_counter()
+        if image_base64:
+            if "base64," in image_base64:
+                image_base64 = image_base64.split("base64,")[1]
+            raw = await self.gpu.describe_image(
+                base64.b64decode(image_base64), "image/png",
+                f"{system_prompt}\n\nStudent Question: {effective_question}")
+        else:
+            raw = await self.gpu.generate([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Student Question: {effective_question}"},
+            ], temperature=0.3)
+        answer, model_citations = self._parse_answer(raw)
+        return {
+            "answer": answer,
+            "sources": self._build_sources(chunks, model_citations, effective_question),
+            "meta": {**r, "generate_s": time.perf_counter() - t0, "model_citations": model_citations,
+                     "assignment_mode": use_tutoring and any(c["is_assignment"] for c in chunks)},
+        }
+
+    async def stream_query(self, *, teacher_id, collection_name, question, image_base64=None, top_k=None, chat_history=None):
         logger.info(f"[stream] START teacher={teacher_id} q={question[:40]}...")
-        
-        # 0. Send padding to burst buffers (4KB is usually enough for all proxies/browsers)
-        yield " " * 4096 
-        logger.info(f"[stream] [{time.time()-t_start:.2f}s] padding sent")
+        yield " " * 4096  # padding to flush proxy/browser buffers before the first token
 
-        # 1. Scope detection
-        scope_pattern = r"^\[Context:\s*Only answer from the file with id\s+([a-f0-9-]+)\]\s*"
-        scope_match = re.match(scope_pattern, question, flags=re.IGNORECASE)
-        scoped_file_id = scope_match.group(1) if scope_match else None
-        effective_question = re.sub(scope_pattern, "", question, flags=re.IGNORECASE).strip()
-
-        # 2. Retrieve chunks
-        q_embedding = (await self.gpu.embed([effective_question]))[0]
-        logger.info(f"[stream] [{time.time()-t_start:.2f}s] embedded")
-        
-        qdrant_filter = None
-        if scoped_file_id:
-            qdrant_filter = {"must": [{"key": "file_id", "match": {"value": scoped_file_id}}]}
-        
-        results = await self.gpu.qdrant_search(collection_name, q_embedding, limit=20, filter_=qdrant_filter)
-        logger.info(f"[stream] [{time.time()-t_start:.2f}s] qdrant search done ({len(results)} res)")
-        
-        if not results:
+        scoped_file_id, effective_question = self._split_scope(question)
+        r = await self.retrieve(collection_name=collection_name, question=effective_question,
+                                scoped_file_id=scoped_file_id, top_k=top_k)
+        chunks = r["chunks"]
+        if not chunks:
             yield "I couldn't find any relevant information in the knowledge base to answer your question."
             return
 
-        docs_for_rerank = [r["payload"]["document"] for r in results]
-        reranked = await self.gpu.rerank(effective_question, docs_for_rerank, top_n=top_k)
-        logger.info(f"[stream] [{time.time()-t_start:.2f}s] rerank done")
-        
-        retrieved_chunks = []
-        for r in reranked:
-            idx = r["index"]
-            p = results[idx]["payload"]
-            retrieved_chunks.append({
-                "chunk": p["document"], "distance": 1 - results[idx]["score"],
-                "file_id": p.get("file_id",""), "file_name": p.get("file_name","unknown"),
-                "chunk_idx": int(p.get("chunk_idx",-1)), "page": int(p.get("page",-1)),
-                "image_index": int(p.get("image_index",-1)), "content_type": p.get("content_type","unknown"),
-                "y_offset": float(p.get("y_offset",0.0)),
-                "score": r["score"]
-            })
-
-        # 3. Build prompt (same as query)
-        context_parts = []
-        for i, res in enumerate(retrieved_chunks, 1):
-            context_parts.append(f"[Source {i}: {res['file_name']} | chunk {res['chunk_idx']}]\n{res['chunk']}")
-        context = "\n\n---\n\n".join(context_parts)
-
-        assignment_protocol = ""
-        if any(c.get("is_assignment") for c in retrieved_chunks):
-            assignment_protocol = (
-                "\n## ASSIGNMENT PROTOCOL\n"
-                "Materials marked as ASSIGNMENTS: provide HINTS only, NOT solutions.\n"
-                "Guide step-by-step. Ask probing questions.\n"
-            )
-
-        history_text = ""
-        if chat_history:
-            for msg in chat_history[-6:]:
-                role = "Student" if msg.get("role") == "user" else "Assistant"
-                history_text += f"{role}: {msg.get('content','')}\n"
-
-        system_prompt = f"""You are an elite Professor's AI Teaching Assistant. Your goal is to provide deep, insightful, and comprehensive explanations based STICTLY on the provided Knowledge Base.
-
-## RESPONSE GUIDELINES
-- Be Professorial: Use academic but accessible language. Provide context and "why" behind facts.
-- Structure: Use Markdown (headers, bold, lists) to make the answer highly readable.
-- Detail: If the context allows, provide a thorough explanation. Do not be terse.
-- Citing: When mentioning a fact, cite it inline like (Source 1).
-- **Video timestamps**: If a chunk contains timestamps like [HH:MM:SS], include the most relevant timestamp in your answer as [MM:SS] or [HH:MM:SS] to help the student locate the exact moment.
-- **Formulas: Use standard LaTeX delimiters. Use $...$ for inline math and $$...$$ for block math.**
-
-## ASSIGNMENT PROTOCOL
-{assignment_protocol}
-
-## CITATIONS BLOCK
-At the very end of your response, you MUST include a "CITATIONS" block in this EXACT JSON format:
-<CITATIONS>
-{{"citations": [{{"source": 1, "quote": "verbatim text"}}]}}
-</CITATIONS>
-Rules: 
-- 'source' is the numeric CHUNK index.
-- 'quote' must be the EXACT verbatim text from that chunk.
-- Include 1-6 high-quality citations.
-
-Conversation History:
-{history_text}
-
-Knowledge Base Context:
-{context}
-"""
         messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Student Question: {effective_question}"}
+            {"role": "system", "content": self._build_system_prompt(chunks, chat_history)},
+            {"role": "user", "content": f"Student Question: {effective_question}"},
         ]
-
-        # 4. Stream Tokens
         full_text = ""
-        async for chunk in self.gpu.stream_generate(messages, temperature=0.3):
-            full_text += chunk
-            yield chunk
+        async for tok in self.gpu.stream_generate(messages, temperature=0.3):
+            full_text += tok
+            yield tok
 
-        # 5. Extract Citations from full_text at the end
-        model_citations = []
-        if "<CITATIONS>" in full_text and "</CITATIONS>" in full_text:
-            try:
-                citation_json = full_text.split("<CITATIONS>")[1].split("</CITATIONS>")[0].strip()
-                payload = self._extract_json(citation_json)
-                if payload and isinstance(payload.get("citations"), list):
-                    model_citations = payload["citations"]
-            except Exception: pass
-        
-        # 6. Build Sources
-        citation_lookup = {}
-        for c in model_citations:
-            if not isinstance(c, dict): continue
-            quote = str(c.get("quote","")).strip()
-            if not quote: continue
-            sn = c.get("source")
-            si = int(sn) if isinstance(sn, int) else (int(sn) if isinstance(sn, str) and sn.strip().isdigit() else None)
-            if si is None or si < 1 or si > len(retrieved_chunks): continue
-            src = retrieved_chunks[si-1]
-            rk = (src["file_id"], src["chunk_idx"])
-            if rk not in citation_lookup or len(quote) > len(citation_lookup[rk]):
-                citation_lookup[rk] = quote
-
-        question_terms = set(re.findall(r"[a-z0-9]{4,}", effective_question.lower()))
-        seen, sources = set(), []
-        for item in retrieved_chunks:
-            rk = (item["file_id"], item["chunk_idx"])
-            if rk in seen: continue
-            seen.add(rk)
-            chunk = item["chunk"]
-            page_val = item["page"]
-            if page_val < 0 and chunk:
-                pm = re.search(r'\[Classification:[^\]]*\bPage\s+(\d+)\b', chunk, re.IGNORECASE)
-                if pm: page_val = int(pm.group(1))
-            snippet = self._build_snippet(chunk, question_terms)
-            ht, hs, he = None, None, None
-            cq = citation_lookup.get(rk)
-            if cq:
-                s, e, et = self._find_quote_span(chunk, cq)
-                if et: ht, hs, he, snippet = et, s, e, et
-                else: ht = cq
-            # Extract first timestamp from YouTube chunks
-            timestamp = None
-            if item["content_type"] in ("youtube",):
-                ts_match = re.search(r'\[(\d{2}:\d{2}:\d{2})\]', chunk)
-                if ts_match:
-                    timestamp = ts_match.group(1)
-                    if timestamp.startswith('00:'):
-                        timestamp = timestamp[3:]
-            sources.append({
-                "file_id": item["file_id"], "file_name": item["file_name"],
-                "relevance": round(1 - item["distance"], 3),
-                "chunk_idx": item["chunk_idx"] if item["chunk_idx"] >= 0 else None,
-                "page": page_val if page_val >= 0 else None,
-                "image_index": item["image_index"] if item["image_index"] >= 0 else None,
-                "content_type": item["content_type"], "snippet": snippet,
-                "highlight_text": ht, "highlight_start": hs, "highlight_end": he,
-                "y_offset": item["y_offset"],
-                "timestamp": timestamp,
-            })
-        
+        _, model_citations = self._parse_answer(full_text)
+        sources = self._build_sources(chunks, model_citations, effective_question)
         yield f"\n[METADATA]{json.dumps({'sources': sources})}"
 
 

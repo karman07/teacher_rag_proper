@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TeachAI RAG Service",
-    description="Per-teacher RAG pipeline using Llama 3.3 + Qdrant (GPU cluster)",
+    description="Per-teacher RAG pipeline using Gemini + Qdrant",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -125,37 +125,14 @@ class TranscribeResponse(BaseModel):
     text: str
     segments: list
 
-_whisper_model = None
-
 @app.post("/transcribe", response_model=TranscribeResponse)
 async def transcribe_audio_route(req: TranscribeRequest):
-    """
-    Standalone endpoint to download and transcribe YouTube audio directly.
-    Fully independent of rag_engine — can be called via HTTP from anywhere.
-    """
-    import httpx
-    from config import get_settings
-    
-    cfg = get_settings()
-    gateway_url = getattr(cfg, "gpu_gateway_url", "https://ai-backend-66976dwa2.brevlab.com")
-    
-    try:
-        async with httpx.AsyncClient(timeout=300) as client:
-            resp = await client.post(
-                f"{gateway_url.rstrip('/')}/transcribe",
-                json={"url": req.url}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return TranscribeResponse(
-                success=data.get("success", True),
-                text=data.get("text", ""),
-                segments=data.get("segments", [])
-            )
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Gateway transcription failed: {str(e)}")
+    """Download YouTube audio with yt-dlp and transcribe it locally with faster-whisper."""
+    engine = get_engine()
+    text = await engine._youtube_audio_fallback(req.url, "youtube")
+    if not text:
+        raise HTTPException(status_code=500, detail="Transcription failed")
+    return TranscribeResponse(success=True, text=text, segments=[])
 
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form
