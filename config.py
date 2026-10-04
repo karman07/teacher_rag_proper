@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     llm_model_name: str = "llama70b"
     vision_model_name: str = "qwen-vl"
 
+    # ── Gemini (OpenAI-compatible). When gemini_api_key is set it replaces the
+    #    GPU cluster LLM + vision models; embeddings/Qdrant still use the gateway.
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+
     class Config:
         env_file = ".env"
         extra = "ignore"

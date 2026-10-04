@@ -12,11 +12,17 @@ logger = logging.getLogger(__name__)
 
 
 class GPUClient:
-    def __init__(self, gateway_url: str, llm_model: str = "llama70b", vision_model: str = "Qwen/Qwen2-VL-7B-Instruct"):
+    def __init__(self, gateway_url: str, llm_model: str = "llama70b", vision_model: str = "Qwen/Qwen2-VL-7B-Instruct",
+                 llm_base_url: str = "", llm_api_key: str = ""):
         self._gateway = gateway_url.rstrip("/")
         self._llm_model = llm_model
         self._vision_model = vision_model
         self._http: Optional[httpx.AsyncClient] = None
+        # LLM + vision go to an OpenAI-compatible API (Gemini) when llm_api_key is set,
+        # otherwise to the GPU gateway. Embeddings/rerank/Qdrant always use the gateway.
+        self._llm_base = llm_base_url.rstrip("/") if llm_api_key else ""
+        self._llm_key = llm_api_key
+        self._llm_http: Optional[httpx.AsyncClient] = None
         logger.info(f"GPUClient initialized — gateway: {self._gateway}")
 
     def _get_http(self) -> httpx.AsyncClient:
@@ -31,6 +37,21 @@ class GPUClient:
                 }
             )
         return self._http
+
+    def _get_llm_http(self) -> httpx.AsyncClient:
+        """Client for chat/vision: Gemini if configured, else the GPU gateway."""
+        if not self._llm_base:
+            return self._get_http()
+        if self._llm_http is None or self._llm_http.is_closed:
+            self._llm_http = httpx.AsyncClient(
+                base_url=self._llm_base,
+                timeout=httpx.Timeout(300.0, connect=15.0),
+                headers={"Authorization": f"Bearer {self._llm_key}"},
+            )
+        return self._llm_http
+
+    def _llm_path(self, kind: str) -> str:
+        return "/chat/completions" if self._llm_base else f"/{kind}/v1/chat/completions"
 
     # ── Embeddings (TEI) ──────────────────────────────────────────────────
 
@@ -86,7 +107,7 @@ class GPUClient:
     # ── LLM Generation (vLLM / OpenAI-compatible) ────────────────────────
 
     async def generate(self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096, response_format: Optional[dict] = None) -> str:
-        http = self._get_http()
+        http = self._get_llm_http()
         body: dict = {
             "model": self._llm_model,
             "messages": messages,
@@ -95,7 +116,7 @@ class GPUClient:
         }
         if response_format:
             body["response_format"] = response_format
-        resp = await http.post("/llm/v1/chat/completions", json=body)
+        resp = await http.post(self._llm_path("llm"), json=body)
         resp.raise_for_status()
         try:
             data = resp.json()
@@ -115,7 +136,7 @@ class GPUClient:
         return data["choices"][0]["message"]["content"]
 
     async def stream_generate(self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 4096):
-        http = self._get_http()
+        http = self._get_llm_http()
         body = {
             "model": self._llm_model,
             "messages": messages,
@@ -124,7 +145,7 @@ class GPUClient:
             "stream": True
         }
         
-        async with http.stream("POST", "/llm/v1/chat/completions", json=body) as resp:
+        async with http.stream("POST", self._llm_path("llm"), json=body) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if not line.strip():
@@ -145,9 +166,9 @@ class GPUClient:
     # ── Vision (vLLM Qwen2-VL / OpenAI Vision-compatible) ────────────────
 
     async def describe_image(self, image_bytes: bytes, mime_type: str, prompt: str) -> str:
-        http = self._get_http()
+        http = self._get_llm_http()
         b64 = base64.b64encode(image_bytes).decode()
-        resp = await http.post("/vision/v1/chat/completions", json={
+        resp = await http.post(self._llm_path("vision"), json={
             "model": self._vision_model,
             "messages": [{"role": "user", "content": [
                 {"type": "text", "text": prompt},

@@ -21,7 +21,10 @@ VISION_PROMPT = (
 class RAGEngine:
     def __init__(self):
         cfg = get_settings()
-        self.gpu = GPUClient(cfg.gpu_gateway_url, cfg.llm_model_name, cfg.vision_model_name)
+        self.gpu = GPUClient(
+            cfg.gpu_gateway_url, cfg.llm_model_name, cfg.vision_model_name,
+            cfg.gemini_base_url, cfg.gemini_api_key,
+        )
         self._uploads_root = cfg.uploads_root
         self._pdf_max_pages = cfg.pdf_max_pages
         self._pdf_max_images_per_page = cfg.pdf_max_images_per_page
