@@ -242,10 +242,7 @@ export default function TermsPage() {
             </div>
             <div className="space-y-4">
               <p className="text-slate-600 leading-relaxed text-[17px]">
-                VTA is independently hosted and is not connected to Washington State University&rsquo;s internal systems, student-information systems, or any learning management system.
-              </p>
-              <p className="text-slate-600 leading-relaxed text-[17px]">
-                VTA is not an official service of Washington State University. Dr. Kumar&rsquo;s university affiliation is provided for professional identification only.
+                VTA is independently hosted and is not connected to any learning management system.
               </p>
               <p className="text-slate-600 leading-relaxed text-[17px]">
                 VTA was developed through research supported by the NVIDIA Academic Grant Program. NVIDIA does not operate VTA, provide its responses, or control its data practices. Grant support does not imply NVIDIA&rsquo;s endorsement of the platform.
