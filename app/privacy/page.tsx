@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
           </h1>
 
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed mb-4">
-            VTA — Virtual Teaching Assistant — is an independently hosted beta educational platform led by Dr. Parteek Kumar Bhatia. It is not connected to Washington State University&rsquo;s systems or to any learning management system.
+            VTA — Virtual Teaching Assistant — is an independently hosted beta educational platform led by Dr. Parteek Kumar Bhatia. It is not connected to any learning management system.
           </p>
 
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -209,9 +209,6 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">6. Independent Platform</h2>
             </div>
             <div className="space-y-4">
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
-                VTA is not an official service of Washington State University. Dr. Kumar&rsquo;s university affiliation is provided for professional identification only.
-              </p>
               <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[17px]">
                 VTA was developed through research supported by the NVIDIA Academic Grant Program. NVIDIA does not operate VTA or control its data practices.
               </p>
